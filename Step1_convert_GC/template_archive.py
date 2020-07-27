@@ -225,8 +225,8 @@ def read_all_GC(all_strdate, lat_mid, lat_ratio, use_Sensi=False, Sensi_datadir=
 Call read_GC() for multiple dates in a loop. 
 
 Arguments
+Same as read_GC(), except instead of 'date' argument, use 
     allstr_date [list, str] : date strings 
-    {Otherwise same as read_GC(), but without 'date' argument}
 
 Returns
     met         [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC().
@@ -249,7 +249,7 @@ Arguments
     GC_p    [float]    : Pressure edge from GEOS-Chem (61)  <--- 61-1=60 pressure levels?
 
 Returns
-    weights [dict]     : Pressure weights ****dig a bit deeper here
+    weights [dict]     : Pressure weights ****what exactly is this dictionary?
 """
 
     # Step 1: Combine Sat_p and GC_p [****Feels like this could be done in fewer lines]
@@ -430,7 +430,6 @@ Returns
                        (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)) &
                        (TROPOMI['qa_value']  >= 0.5)
     # ****Why are we using local times here? Shouldn't we be using UTC?
-    # ****What about for non-rectangular inversion domains? Need to do this differently.
 
     # Number of TROPOMI observations? ****
     NN = len(sat_ind[0])
@@ -592,52 +591,53 @@ Returns
 #
 # ==================================================================================================
 
+# Configuration
 use_Sensi = True 
-workdir="/n/holyscratch01/jacob_lab/lshen/CH4/GEOS-Chem/Flexgrid/CPU_mexico_inversion/"
-Sat_datadir=workdir+"data_TROPOMI/"
-GC_datadir=workdir+"data_GC/"
-outputdir=workdir+"data_converted/"
-Sensi_datadir=workdir+"Sensi/"
+workdir = "/n/holyscratch01/jacob_lab/lshen/CH4/GEOS-Chem/Flexgrid/CPU_mexico_inversion/"
+Sat_datadir = workdir+"data_TROPOMI/"
+GC_datadir = workdir+"data_GC/"
+outputdir = workdir+"data_converted/"
+Sensi_datadir = workdir+"Sensi/"
+xlim = [-107.8125,-80.9375]
+ylim = [10,36]
+GC_startdate = datetime.datetime.strptime("2018-05-01 00:00:00", '%Y-%m-%d %H:%M:%S')
+GC_enddate = datetime.datetime.strptime("2019-12-30 23:59:59", '%Y-%m-%d %H:%M:%S')
+GC_startdate = np.datetime64(GC_startdate)
+GC_enddate = np.datetime64(GC_enddate)
 
+# Move to Step1 directory
 os.chdir(workdir+"Step1_convert_GC")
-#==== read GC lon and lat ===
-data=xr.open_dataset(glob.glob(GC_datadir+"*.nc4")[0])
-GC_lon=data['lon'].values
-GC_lat=data['lat'].values
-data.close()
 
-#==== read lat_ratio ===
-df=pd.read_csv("./lat_ratio.csv",index_col=0)
-lat_mid=df.index
-lat_ratio=df.values
+# Read lat_ratio ****what is this? Looks like a manual step.
+df = pd.read_csv("./lat_ratio.csv", index_col=0)
+lat_mid = df.index
+lat_ratio = df.values
 
-GC_startdate=datetime.datetime.strptime("2018-05-01 00:00:00", '%Y-%m-%d %H:%M:%S')
-GC_enddate=datetime.datetime.strptime("2019-12-30 23:59:59", '%Y-%m-%d %H:%M:%S')
-GC_startdate=np.datetime64(GC_startdate)
-GC_enddate=np.datetime64(GC_enddate)
-
-#==== read Satellite ===
-allfiles=glob.glob(Sat_datadir+'*.nc')
-Sat_files=[]
+# Get TROPOMI data filenames for the desired date range
+allfiles = glob.glob(Sat_datadir+'*.nc')
+Sat_files = []
 for index in range(len(allfiles)):
-    filename=allfiles[index]
-    shortname=re.split('\/', filename)[-1]
-    shortname=re.split('\.', shortname)[0]
-    strdate=re.split('\.|_+|T',shortname)[4]
+    filename = allfiles[index]
+    shortname = re.split('\/', filename)[-1]
+    shortname = re.split('\.', shortname)[0]
+    strdate = re.split('\.|_+|T',shortname)[4]
     strdate2 = datetime.datetime.strptime(strdate, '%Y%m%d')
-    if ((strdate2>=GC_startdate) and (strdate2<=GC_enddate)):
+    if ((strdate2 >= GC_startdate) and (strdate2 <= GC_enddate)):
         Sat_files.append(filename)
-
 Sat_files.sort()
-print("Number of files",len(Sat_files))
+print('Found',len(Sat_files),'TROPOMI data files.')
 
-for index in range(({run_num}-1)*1000,{run_num}*1000):
+# Map GEOS-Chem to TROPOMI observation space (potentially return Jacobian matrix)
+# for index in range(({run_num}-1)*1000,{run_num}*1000): #****Not sure what this is about... run_num not defined
+for filename in Sat_files:
     print('========================')
-    filename=Sat_files[index]    
-    temp=re.split('\/', filename)[-1]
+    # Get file name and check if it's already been processed
+    temp = re.split('\/', filename)[-1]
     print(temp)
-    date=re.split('\.',temp)[0]
+    date = re.split('\.',temp)[0]
     if os.path.isfile(outputdir+date+'_GCtoTROPOMI.pkl'):
         continue
-    result=use_AK_to_GC(filename,GC_startdate,GC_enddate,use_Sensi=True,xlim=[-107.8125,-80.9375],ylim=[10,36])
-    save_obj(result,outputdir+date+'_GCtoTROPOMI.pkl')
+    # If not yet processed, run use_AK_to_GC()
+    result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir)
+    # Save the result
+    save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
