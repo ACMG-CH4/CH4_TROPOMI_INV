@@ -148,7 +148,7 @@ Arguments
     lat_mid       [?]   : ?
     lat_ratio     [?]   : ?
     use_Sensi     [log] : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-    Sensi_datadir [str] : If use_Sensi=True, this is the path to the GC sensitivity data.
+    Sensi_datadir [str] : If use_Sensi=True, this is the path to the GC sensitivity data
 
 Returns
     met           [dict] : Dictionary of important variables from GEOS-Chem:
@@ -233,7 +233,7 @@ Same as read_GC(), except instead of 'date' argument, use
     allstr_date [list, str] : date strings 
 
 Returns
-    met         [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC().
+    met         [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC()
 """
 
     met={}
@@ -315,7 +315,7 @@ Arguments
     first_2   [?]       : ???
 
 Returns
-    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates.
+    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
 """
     
     # ****Step 3: ???
@@ -356,7 +356,7 @@ Arguments
     first_2   [?]       : ???
 
 Returns
-    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates.
+    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
 """
     
     # ****Step 3: ???
@@ -390,6 +390,7 @@ Returns
 
 def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 """ Find the index of the nearest grid location to a query location, with some tolerance. """
+
     distances = np.abs(loc_grid - loc_query)
     ind = temp.argmin()
     if distances[ind] >= tolerance:
@@ -400,29 +401,31 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 
 # --------------------------------------------------------------------------------------------------
 
-def use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir):
+def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir):
 """
 Map GEOS-Chem data to TROPOMI observation space.
 
 Arguments
-    filename      [str]        : TROPOMI netcdf data file to read.
+    filename      [str]        : TROPOMI netcdf data file to read
+    n_clust       [int]        : Number of clusters / state vector elements
     GC_startdate  [datetime64] : First day of inversion period, for GC and TROPOMI
     GC_enddate    [datetime64] : Last day of inversion period, for GC and TROPOMI
-    xlim          [float]      : Longitude bounds for simulation domain.
-    ylim          [float]      : Latitude bounds for simulation domain.
+    xlim          [float]      : Longitude bounds for simulation domain
+    ylim          [float]      : Latitude bounds for simulation domain
     lat_mid       [?]          : ?
     lat_ratio     [?]          : ?
     use_Sensi     [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-    Sensi_datadir [str]        : If use_Sensi=True, this is the path to the GC sensitivity data.
+    Sensi_datadir [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
 
 Returns
-    result        [dict]       : Dictionary with one or two fields:
+    result        [dict]       : Dictionary with one or two fields
 				   - obs_GC : GEOS-Chem and TROPOMI methane data
 						- TROPOMI methane
 						- GC methane
 						- TROPOMI lat, lon
 						- TROPOMI lat index, lon index
-				   - KK     : Jacobian matrix. ****I think? Only if use_Sensi=True
+				   If use_Sensi=True, also include:
+				   - KK     : Jacobian matrix ****I think?
 """
     
     # Read TROPOMI data
@@ -441,8 +444,7 @@ Returns
 
     # If need to build Jacobian from GC perturbation simulation sensitivity data:
     if use_Sensi:
-        MM = 1199+8      #****Hard-coded, need to fix
-        temp_KK = np.zeros([NN,MM], dtype=np.float32) # Initialize Jacobian K
+        temp_KK = np.zeros([NN,n_clust], dtype=np.float32) # Initialize Jacobian K
         temp_KK.fill(np.nan)
     
     # Initialize array with NN rows, 6 columns: TROPOMI-CH4, GC-CH4, longitude, latitude, II, JJ
@@ -551,7 +553,7 @@ Returns
                 ****What is all this?
                 pedge = GC['PEDGE'][iGC,jGC,:]
                 pp = pedge[:47]-pedge[1:]
-                pedges = np.transpose(np.tile(pp,(MM,1)))
+                pedges = np.transpose(np.tile(pp,(n_clust,1)))
                 ap = GC['Sensi'][iGC,jGC,:,:]*pedges                                
                 Sensi = np.sum(ap,0)/(pedge[0]-pedge[-1])
                 GC_base_sensi = GC_base_sensi+overlap_area[ipixel]*Sensi
@@ -562,9 +564,9 @@ Returns
                 # Remap the sensitivities to TROPOMI observation space
                 Sat_CH4 = remap2(Sensi, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2'])                
                 # Tile the TROPOMI averaging kernel
-                AKs = np.transpose(np.tile(AK, (MM,1)))
+                AKs = np.transpose(np.tile(AK, (n_clust,1)))
                 # Tile the TROPOMI dry air subcolumns
-                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (MM,1)))
+                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_clust,1)))
                 # ****Not sure what happens in this critical step.
                 ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s,0)/sum(dry_air_subcolumns)
                 GC_base_sensi += overlap_area[ipixel] * ap
@@ -580,7 +582,7 @@ Returns
             temp_KK[iNN,:] = GC_base_sensi/sum(overlap_area)
     
     # Output 
-    result={}
+    result = {}
     result['obs_GC'] = temp_obs_GC  # Always return the coincident TROPOMI and GC data
     if use_Sensi:
         result['KK'] = temp_KK      # Optionally return ****Jacobian? Or something to build the Jacobian?
@@ -602,6 +604,7 @@ Sat_datadir = workdir+"data_TROPOMI/"
 GC_datadir = workdir+"data_GC/"
 outputdir = workdir+"data_converted/"
 Sensi_datadir = workdir+"Sensi/"
+n_clust = 1199+8 # For Lu's Mexico inversion
 xlim = [-107.8125,-80.9375]
 ylim = [10,36]
 GC_startdate = datetime.datetime.strptime("2018-05-01 00:00:00", '%Y-%m-%d %H:%M:%S')
