@@ -15,6 +15,8 @@ from shapely.geometry import Polygon
 # - I think one of the manual steps Lu talked about is pre-defining the GEOS-Chem sensitivities
 #   from the perturbation simulations. Once you've done all your perturbation runs, you then 
 #   subtract the base run output from all of the perturbation outputs, to get sensitivity arrays.
+# - Another manual step seems to be building the lat_ratio.csv file used to define the lat_ratio
+#   variable.
 # - I'm generally a bit confused about array shapes and need to run some of the functions to see 
 #   what inputs and outputs actually look like.
 # - Confused about the pixels/corners/overlap_area stuff in the last function.
@@ -31,6 +33,7 @@ from shapely.geometry import Polygon
 
 def save_obj(obj, name):
 """ Save something with Pickle. """
+    
     with open(name , 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
@@ -39,6 +42,7 @@ def save_obj(obj, name):
 
 def load_obj(name):
 """ Load something with Pickle. """
+
     with open( name, 'rb') as f:
         return pickle.load(f)
 
