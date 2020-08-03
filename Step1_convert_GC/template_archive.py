@@ -659,5 +659,5 @@ for filename in Sat_files:
     date = re.split('\.',temp)[0]
     # If not yet processed, run use_AK_to_GC()
     if ~os.path.isfile(outputdir+date+'_GCtoTROPOMI.pkl'):
-        result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir)
+        result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir, correct_strato)
         save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
