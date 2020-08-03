@@ -21,6 +21,14 @@ from shapely.geometry import Polygon
 # - Not clear on how longitudes get transformed into time offsets for computing local times.
 # - Lu optimizes scaling factors, so he increases the sensitivities by a factor of two, due to 
 #   1.5 scaling perturbation. This doesn't work if we are optimizing absolute emissions.
+# - Not sure about some variables in the cal_weights() and remap()/remap2() functions:
+# 	- data_type
+# 	- location
+#	- first_2
+# - When Lu computes virtual TROPOMI column from GC data using the TROPOMI prior and averaging
+#   kernel, he does it as the weighted mean mixing ratio [ppb] of the relevant GC ground cells.
+#   Zhen does it as the weighted mean of number of molecules instead. This requires saving out
+#   an additional GC diagnostic variable -- something like the mass column in addition to PEDGE.
 
 # ==================================================================================================
 #
@@ -79,7 +87,7 @@ Returns
     met['longitude'] = data['longitude'].values[0,:,:]                         # 3245x215
     met['latitude'] = data['latitude'].values[0,:,:]                           # 3245x215 
     
-    # Store UTC time [****why is this necessary? time_utc is a standard tropomi]
+    # Store UTC time [****why is this necessary? time_utc is a standard tropomi variable]
     referencetime = data['time'].values
     delta_time = data['delta_time'][0].values                                  # 3245x1
     strdate = []
@@ -93,7 +101,7 @@ Returns
     met['utctime'] = strdate
     
     # Store local time
-    # ****This assumes 24 equal-sized (15-degree) time zones, but that's not really the case...
+    # [****This assumes 24 equal-sized (15-degree) time zones, but is that valid?]
     timeshift = np.array(met['longitude']/15*60, dtype=int)                             # Convert to minutes
     localtimes = np.zeros(shape=timeshift.shape, dtype='datetime64[ns]')
     for kk in range(timeshift.shape[0]):
@@ -213,7 +221,7 @@ Returns
         Sensi = np.einsum('klji->ijlk', Sensi)
         data.close()
         # Now adjust the Sensitivity
-        Sensi = Sensi*2              # Because we perturb the emissions by 50% ****Only makes sense if optimize scale factors
+        Sensi = Sensi*2              # Because we perturb the emissions by 50% [****Only makes sense if optimize scale factors]
         met['Sensi'] = Sensi
 
     # Done
@@ -245,7 +253,7 @@ Returns
 def cal_weights(Sat_p, GC_p):
 """
 Calculate pressure weights for TROPOMI & GC
-****Need more detailed description. What exactly does the output dictionary look like?
+[****Need more detailed description. What exactly does the output dictionary look like?]
 
 Arguments
     Sat_p   [float]    : Pressure edge from TROPOMI (13)    <--- 13-1 = 12 pressure levels?
@@ -436,7 +444,7 @@ Returns
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
                        (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)) &
                        (TROPOMI['qa_value']  >= 0.5)
-    # ****Why are we using local times here? Shouldn't we be using UTC?
+    # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
     NN = len(sat_ind[0])
@@ -453,7 +461,7 @@ Returns
     temp_obs_GC.fill(np.nan)
     
     # Initialize a list to store the dates we want to look at
-    all_strdate=[]
+    all_strdate = []
 
     # For each TROPOMI observation
     for iNN in range(NN):
@@ -462,7 +470,7 @@ Returns
         iSat = sat_ind[0][iNN] # lat index
         jSat = sat_ind[1][iNN] # lon index
         timeshift = int(TROPOMI['longitude'][iSat,jSat]/15*60)
-        timeshift = 0 # Now I use UTC time instead of local time ****Why?
+        timeshift = 0 # Now I use UTC time instead of local time [****Why?]
         localtime = TROPOMI['utctime'][iSat] + np.timedelta64(timeshift, 'm') # local time
         localtime = pd.to_datetime(str(localtime))
         strdate = localtime.round('60min').strftime("%Y%m%d_%H")        
