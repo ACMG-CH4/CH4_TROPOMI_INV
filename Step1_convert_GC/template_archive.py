@@ -29,6 +29,8 @@ from shapely.geometry import Polygon
 #   kernel, he does it as the weighted mean mixing ratio [ppb] of the relevant GC ground cells.
 #   Zhen does it as the weighted mean of number of molecules instead. This requires saving out
 #   an additional GC diagnostic variable -- something like the mass column in addition to PEDGE.
+# - Need to double-check units of Jacobian [mixing ratio, unitless] vs units of virtual TROPOMI
+#   column [ppb] in use_AK_to_GC().
 
 # ==================================================================================================
 #
@@ -145,18 +147,18 @@ Returns
 
 # --------------------------------------------------------------------------------------------------
 
-def read_GC(date, lat_mid, lat_ratio, use_Sensi=False, Sensi_datadir=None, correct_strato=False):
+def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
 """
 Read GEOS-Chem data and save important variables to dictionary.
 
 Arguments
     date           [str]   : date of interest
-    lat_mid        [float] : Center latitude of each grid box
-    lat_ratio      [float] : Ratio for correcting GC stratospheric methane to match ACE-FTS
     use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
     Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC sensitivity data
     correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
-
+    lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
+    lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+    
 Returns
     met           [dict]  : Dictionary of important variables from GEOS-Chem:
 			      - CH4
@@ -164,7 +166,7 @@ Returns
 			      - Longitude
 			      - PEDGE
 			      - TROPP
-                              - CH4_adjusted, if correct_strao=True
+                              - CH4_adjusted, if correct_strato=True
 """
     
     # Assemble file paths to GC output collections for input data
@@ -233,7 +235,7 @@ Returns
 
 # --------------------------------------------------------------------------------------------------
 
-def read_all_GC(all_strdate, lat_mid, lat_ratio, use_Sensi=False, Sensi_datadir=None, correct_strato=False):
+def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
 """ 
 Call read_GC() for multiple dates in a loop. 
 
@@ -247,7 +249,7 @@ Returns
 
     met={}
     for strdate in all_strdate:
-        met[strdate] = read_GC(strdate, lat_mid, lat_ratio, use_Sensi, Sensi_datadir, correct_strato) 
+        met[strdate] = read_GC(strdate, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
     
     return met
 
@@ -413,7 +415,7 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 
 # --------------------------------------------------------------------------------------------------
 
-def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir, correct_strato):
+def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid=None, lat_ratio=None):
 """
 Map GEOS-Chem data to TROPOMI observation space.
 
@@ -424,11 +426,11 @@ Arguments
     GC_enddate     [datetime64] : Last day of inversion period, for GC and TROPOMI
     xlim           [float]      : Longitude bounds for simulation domain
     ylim           [float]      : Latitude bounds for simulation domain
-    lat_mid        [float]      : Center latitude of each grid box
-    lat_ratio      [float]      : Ratio for correcting GC stratospheric methane to match ACE-FTS
     use_Sensi      [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
     Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
     correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
+    lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
+    lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
 
 Returns
     result         [dict]       : Dictionary with one or two fields:
@@ -483,7 +485,7 @@ Returns
     all_strdate = list(set(all_strdate))
 
     # Read GEOS_Chem data for the dates of interest
-    all_date_GC = read_all_GC(all_strdate, lat_mid, lat_ratio, use_Sensi, Sensi_datadir, correct_strato)
+    all_date_GC = read_all_GC(all_strdate, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
    
     # For each TROPOMI observation: 
     for iNN in range(NN):
@@ -493,7 +495,7 @@ Returns
         jSat = sat_ind[1][iNN]
         Sat_p = TROPOMI['pressures'][iSat,jSat,:]
         dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
-        priori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]
+        priori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]              # mol m-2
         AK = TROPOMI['column_AK'][iSat,jSat,:]
         timeshift = int(TROPOMI['longitude'][iSat,jSat]/15*60)
         timeshift = 0
@@ -565,20 +567,20 @@ Returns
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             tropomi_sees_ipixel = sum(priori + AK * (Sat_CH4_2-priori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             # Weight by overlapping area (to be divided out later) and add to sum
-            GC_base_posteri += overlap_area[ipixel] * tropomi_sees_ipixel                                 # m2
+            GC_base_posteri += overlap_area[ipixel] * tropomi_sees_ipixel                                 # ppb m2
 
             # If building Jacobian matrix from GC perturbation simulation sensitivity data:
             if use_Sensi:            
                 # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and clusters
                 Sensi = GC['Sensi'][iGC,jGC,:,:]
-                # Remap the sensitivities to TROPOMI observation space
-                Sat_CH4 = remap2(Sensi, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2']) # ppb               
+                # Map the sensitivities to TROPOMI pressure levels
+                Sat_CH4 = remap2(Sensi, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2'])      # mixing ratio, unitless 
                 # Tile the TROPOMI averaging kernel
                 AKs = np.transpose(np.tile(AK, (n_clust,1)))
                 # Tile the TROPOMI dry air subcolumns
-                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_clust,1)))
+                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_clust,1)))             # mol m-2
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
-                ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s, 0) / sum(dry_air_subcolumns)                # ppb
+                ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s, 0) / sum(dry_air_subcolumns)                # mixing ratio, unitless
                 # Weight by overlapping area (to be divided out later) and add to sum
                 GC_base_sensi += overlap_area[ipixel] * ap                                                # m2
 
@@ -631,11 +633,6 @@ GC_enddate = np.datetime64(datetime.datetime.strptime("2019-12-30 23:59:59", '%Y
 # Move to Step1 directory
 os.chdir(workdir+"Step1_convert_GC")
 
-# Read lat_ratio
-df = pd.read_csv("./lat_ratio.csv", index_col=0)
-lat_mid = df.index
-lat_ratio = df.values
-
 # Get TROPOMI data filenames for the desired date range
 allfiles = glob.glob(Sat_datadir+'*.nc')
 Sat_files = []
@@ -659,5 +656,11 @@ for filename in Sat_files:
     date = re.split('\.',temp)[0]
     # If not yet processed, run use_AK_to_GC()
     if ~os.path.isfile(outputdir+date+'_GCtoTROPOMI.pkl'):
-        result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, lat_mid, lat_ratio, use_Sensi, Sensi_datadir, correct_strato)
-        save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
+        if correct_strato:
+            df = pd.read_csv("./lat_ratio.csv", index_col=0)
+            lat_mid = df.index
+            lat_ratio = df.values
+            result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+        else:
+            result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato)
+    save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
