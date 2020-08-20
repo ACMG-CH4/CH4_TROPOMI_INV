@@ -12,11 +12,11 @@ from shapely.geometry import Polygon
 
 # Notes:
 # ======
-# - I think one of the manual steps Lu talked about is pre-defining the GEOS-Chem sensitivities
-#   from the perturbation simulations. Once you've done all your perturbation runs, you then 
-#   subtract the base run output from all of the perturbation outputs, to get sensitivity arrays.
-# - Another manual step seems to be building the lat_ratio.csv file used to define the lat_ratio
-#   variable.
+# - Manual step 1: Pre-define the GEOS-Chem sensitivities from the perturbation simulations.
+#   Once all perturbation runs are finished, subtract output of the base run from all of the 
+#   perturbation outputs, to obtain one 4D sensitivity array for each simulation time step 
+#   (one 4D array per hour, in Lu's setup).
+# - Manual step 2: Build the lat_ratio.csv file used to define the lat_ratio variable.
 # - Not sure why we need both local times and UTC times.
 # - Not clear on how longitudes get transformed into time offsets for computing local times.
 # - Lu optimizes scaling factors, so he increases the sensitivities by a factor of two, due to 
@@ -31,6 +31,7 @@ from shapely.geometry import Polygon
 #   an additional GC diagnostic variable -- something like the mass column in addition to PEDGE.
 # - Need to double-check units of Jacobian [mixing ratio, unitless] vs units of virtual TROPOMI
 #   column [ppb] in use_AK_to_GC().
+# - Is TROPP used for anything?
 
 # ==================================================================================================
 #
@@ -39,7 +40,7 @@ from shapely.geometry import Polygon
 # ==================================================================================================
 
 def save_obj(obj, name):
-""" Save something with Pickle. """
+    """ Save something with Pickle. """
     
     with open(name , 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
@@ -48,7 +49,7 @@ def save_obj(obj, name):
 # --------------------------------------------------------------------------------------------------
 
 def load_obj(name):
-""" Load something with Pickle. """
+    """ Load something with Pickle. """
 
     with open( name, 'rb') as f:
         return pickle.load(f)
@@ -57,27 +58,27 @@ def load_obj(name):
 # --------------------------------------------------------------------------------------------------
     
 def read_tropomi(filename):
-"""
-Read TROPOMI data and save important variables to dictionary.
+    """
+    Read TROPOMI data and save important variables to dictionary.
 
-Arguments
-    filename [str]  : TROPOMI netcdf data file to read
+    Arguments
+        filename [str]  : TROPOMI netcdf data file to read
 
-Returns
-    met      [dict] : Dictionary of important variables from TROPOMI:
-			- CH4
- 			- Latitude
-			- Longitude
-       		        - QA value
- 			- UTC time
- 			- Local time
-			- Averaging kernel
-			- CH4 prior profile
-			- Dry air subcolumns
-			- Latitude bounds
- 			- Longitude bounds
-			- Vertical pressure profile
-"""
+    Returns
+        met      [dict] : Dictionary of important variables from TROPOMI:
+	    		    - CH4
+ 			    - Latitude
+			    - Longitude
+       		            - QA value
+ 			    - UTC time
+ 			    - Local time
+			    - Averaging kernel
+			    - CH4 prior profile
+			    - Dry air subcolumns
+			    - Latitude bounds
+ 			    - Longitude bounds
+			    - Vertical pressure profile
+    """
 
     # Initialize dictionary for TROPOMI data
     met = {}
@@ -148,26 +149,26 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
-"""
-Read GEOS-Chem data and save important variables to dictionary.
+    """
+    Read GEOS-Chem data and save important variables to dictionary.
 
-Arguments
-    date           [str]   : date of interest
-    use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-    Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC sensitivity data
-    correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
-    lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
-    lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+    Arguments
+        date           [str]   : date of interest
+        use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC sensitivity data
+        correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
+        lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
+        lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
     
-Returns
-    met           [dict]  : Dictionary of important variables from GEOS-Chem:
-			      - CH4
-			      - Latitude
-			      - Longitude
-			      - PEDGE
-			      - TROPP
-                              - CH4_adjusted, if correct_strato=True
-"""
+    Returns
+        met           [dict]  : Dictionary of important variables from GEOS-Chem:
+			          - CH4
+			          - Latitude
+			          - Longitude
+			          - PEDGE
+			          - TROPP, if correct_strato=True
+                                  - CH4_adjusted, if correct_strato=True
+    """
     
     # Assemble file paths to GC output collections for input data
     month = int(date[4:6])
@@ -192,15 +193,16 @@ Returns
     PEDGE = np.einsum('lij->jil', PEDGE)
     data.close()
     
-    # Read tropopause level from StateMet collection
-    filename = GC_datadir+'/'+file_troppause
-    data = xr.open_dataset(filename)
-    TROPP = data['Met_TropLev'].values[0,:,:];
-    TROPP = np.einsum('ij->ji', TROPP)
-    data.close()    
-        
     # If want to do latitudinal correction of stratospheric bias in GEOS-Chem:
     if correct_strato:
+        
+        # Read tropopause level from StateMet collection
+        filename = GC_datadir+'/'+file_troppause
+        data = xr.open_dataset(filename)
+        TROPP = data['Met_TropLev'].values[0,:,:];
+        TROPP = np.einsum('ij->ji', TROPP)
+        data.close()
+
         CH4_adjusted = CH4.copy()
         for i in range(len(LON)):
             for j in range(len(LAT)):
@@ -214,8 +216,8 @@ Returns
     met['lat'] = LAT
     met['PEDGE'] = PEDGE
     met['CH4'] = CH4
-    met['TROPP'] = TROPP
     if correct_strato:
+        met['TROPP'] = TROPP
         met['CH4_adjusted'] = CH4_adjusted
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
@@ -236,16 +238,16 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
-""" 
-Call read_GC() for multiple dates in a loop. 
+    """ 
+    Call read_GC() for multiple dates in a loop. 
 
-Arguments
-Same as read_GC(), except instead of 'date' argument, use 
-    allstr_date [list, str] : date strings 
+    Arguments
+    Same as read_GC(), except instead of 'date' argument, use 
+        allstr_date [list, str] : date strings 
 
-Returns
-    met         [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC()
-"""
+    Returns
+        met         [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC()
+    """
 
     met={}
     for strdate in all_strdate:
@@ -257,22 +259,24 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def cal_weights(Sat_p, GC_p):
-"""
-Calculate pressure weights for TROPOMI & GC
-[****Need more detailed description. What exactly does the output dictionary look like?]
+    """
+    Calculate pressure weights for TROPOMI & GC
+    [****Need more detailed description. What exactly does the output dictionary look like?]
 
-Arguments
-    Sat_p   [float]    : Pressure edge from TROPOMI (13)    <--- 13-1 = 12 pressure levels?
-    GC_p    [float]    : Pressure edge from GEOS-Chem (61)  <--- 61-1 = 60 pressure levels?
+    Arguments
+        Sat_p   [float]    : Pressure edge from TROPOMI (13)          <--- 13-1 = 12 pressure levels
+        GC_p    [float]    : Pressure edge from GEOS-Chem (48)        <--- 48-1 = 47 pressure levels
 
-Returns
-    weights [dict]     : Pressure weights
+    Returns
+        weights [dict]     : Pressure weights
 """
 
     # Step 1: Combine Sat_p and GC_p 
     #         [****Possible to do this in fewer lines?]
-    Com_p = np.zeros(len(Sat_p)+len(GC_p)); Com_p.fill(np.nan)
-    data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int); data_type.fill(-99)
+    Com_p = np.zeros(len(Sat_p)+len(GC_p));                     # <--- 61-1 = 60 pressure levels
+    Com_p.fill(np.nan)
+    data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int); 
+    data_type.fill(-99)
     location = []
     i=0;j=0;k=0
     while ((i < len(Sat_p)) or (j < len(GC_p))):
@@ -318,19 +322,19 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def remap(GC_CH4, data_type, Com_p, location, first_2):
-"""
-Remap GEOS-Chem methane to TROPOMI vertical grid.
+    """
+    Remap GEOS-Chem methane to TROPOMI vertical grid.
 
-Arguments
-    GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
-    data_type [int]     : ???
-    Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-    location  [int]     : ???
-    first_2   [int]     : ???
+    Arguments
+        GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
+        data_type [int]     : ???
+        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
+        location  [int]     : ???
+        first_2   [int]     : ???
 
-Returns
-    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
-"""
+    Returns
+        Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
+    """
     
     # ****Step 3: ???
     conc = np.zeros(len(Com_p)-1,); conc.fill(np.nan)
@@ -359,19 +363,19 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def remap2(Sensi, data_type, Com_p, location, first_2):
-"""
-Remap GEOS-Chem sensitivity data (from perturbation simulations) to TROPOMI vertical grid.
+    """
+    Remap GEOS-Chem sensitivity data (from perturbation simulations) to TROPOMI vertical grid.
 
-Arguments
-    Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lat, lon, alt, cluster)****check dim order
-    data_type [int]     : ???
-    Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-    location  [int]     : ???
-    first_2   [int]     : ???
+    Arguments
+        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster)****check dim order
+        data_type [int]     : ???
+        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
+        location  [int]     : ???
+        first_2   [int]     : ???
 
-Returns
-    Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
-"""
+    Returns
+        Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
+    """
     
     # ****Step 3: ???
     MM = Sensi.shape[1]
@@ -403,7 +407,7 @@ Returns
 # --------------------------------------------------------------------------------------------------
 
 def nearest_loc(loc_query, loc_grid, tolerance=0.5):
-""" Find the index of the nearest grid location to a query location, with some tolerance. """
+    """ Find the index of the nearest grid location to a query location, with some tolerance. """
 
     distances = np.abs(loc_grid - loc_query)
     ind = temp.argmin()
@@ -416,32 +420,32 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 # --------------------------------------------------------------------------------------------------
 
 def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid=None, lat_ratio=None):
-"""
-Map GEOS-Chem data to TROPOMI observation space.
+    """
+    Map GEOS-Chem data to TROPOMI observation space.
 
-Arguments
-    filename       [str]        : TROPOMI netcdf data file to read
-    n_clust        [int]        : Number of clusters / state vector elements
-    GC_startdate   [datetime64] : First day of inversion period, for GC and TROPOMI
-    GC_enddate     [datetime64] : Last day of inversion period, for GC and TROPOMI
-    xlim           [float]      : Longitude bounds for simulation domain
-    ylim           [float]      : Latitude bounds for simulation domain
-    use_Sensi      [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-    Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
-    correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
-    lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
-    lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+    Arguments
+        filename       [str]        : TROPOMI netcdf data file to read
+        n_clust        [int]        : Number of clusters / state vector elements
+        GC_startdate   [datetime64] : First day of inversion period, for GC and TROPOMI
+        GC_enddate     [datetime64] : Last day of inversion period, for GC and TROPOMI
+        xlim           [float]      : Longitude bounds for simulation domain
+        ylim           [float]      : Latitude bounds for simulation domain
+        use_Sensi      [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
+        correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
+        lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
+        lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
 
-Returns
-    result         [dict]       : Dictionary with one or two fields:
- 		 		    - obs_GC : GEOS-Chem and TROPOMI methane data
-	 					 - TROPOMI methane
-						 - GC methane
-						 - TROPOMI lat, lon
-						 - TROPOMI lat index, lon index
-				  If use_Sensi=True, also include:
-				    - KK     : Jacobian matrix
-"""
+    Returns
+        result         [dict]       : Dictionary with one or two fields:
+ 	   	 		        - obs_GC : GEOS-Chem and TROPOMI methane data
+	 					     - TROPOMI methane
+						     - GC methane
+						     - TROPOMI lat, lon
+						     - TROPOMI lat index, lon index
+				      If use_Sensi=True, also include:
+				        - KK     : Jacobian matrix
+    """
     
     # Read TROPOMI data
     TROPOMI = read_tropomi(filename)
