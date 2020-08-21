@@ -148,7 +148,7 @@ def read_tropomi(filename):
 
 # --------------------------------------------------------------------------------------------------
 
-def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
+def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
 
@@ -222,9 +222,9 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=N
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
     if use_Sensi:
-        filename = Sensi_datadir+'/'+date+'.nc'
+        filename = Sensi_datadir+'/Sensi_'+date+'.nc'
         data = xr.open_dataset(filename)
-        Sensi = data['Sensi'].values
+        Sensi = data['Sensitivities'].values
         Sensi = np.einsum('klji->ijlk', Sensi)
         data.close()
         # Now adjust the Sensitivity
@@ -237,7 +237,7 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=N
 
 # --------------------------------------------------------------------------------------------------
 
-def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato, lat_mid=None, lat_ratio=None):
+def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """ 
     Call read_GC() for multiple dates in a loop. 
 
@@ -410,7 +410,7 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
     """ Find the index of the nearest grid location to a query location, with some tolerance. """
 
     distances = np.abs(loc_grid - loc_query)
-    ind = temp.argmin()
+    ind = distances.argmin()
     if distances[ind] >= tolerance:
         return np.nan
     else:
@@ -419,7 +419,7 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 
 # --------------------------------------------------------------------------------------------------
 
-def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid=None, lat_ratio=None):
+def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Map GEOS-Chem data to TROPOMI observation space.
 
@@ -453,8 +453,8 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
     # We're only going to consider data within lat/lon/time bounds, and with QA > 0.5
     sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
-                       (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)) &
-                       (TROPOMI['qa_value']  >= 0.5)
+                       (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)  &
+                       (TROPOMI['qa_value']  >= 0.5))
     # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
@@ -664,7 +664,7 @@ for filename in Sat_files:
             df = pd.read_csv("./lat_ratio.csv", index_col=0)
             lat_mid = df.index
             lat_ratio = df.values
-            result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+            result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
         else:
-            result = use_AK_to_GC(filename, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato)
+            result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir)
     save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
