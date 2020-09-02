@@ -20,7 +20,7 @@ import os
 # ==================================================================================================
 
 def save_obj(obj, name ):
-""" Save something with Pickle. """
+    """ Save something with Pickle. """
 
     with open(name , 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
@@ -29,7 +29,7 @@ def save_obj(obj, name ):
 # --------------------------------------------------------------------------------------------------
 
 def load_obj(name):
-""" Load something with Pickle. """
+    """ Load something with Pickle. """
 
     with open( name, 'rb') as f:
         return pickle.load(f)
@@ -38,10 +38,10 @@ def load_obj(name):
 # --------------------------------------------------------------------------------------------------
 
 def nearest_loc(loc_query, loc_grid, tolerance=1):
-""" Find the index of the nearest grid location to a query location, with some tolerance. """
+    """ Find the index of the nearest grid location to a query location, with some tolerance. """
 
     distances = np.abs(loc_grid - loc_query)
-    ind = temp.argmin()
+    ind = distances.argmin()
     if distances[ind] >= tolerance:
         return np.nan
     else:
@@ -92,14 +92,14 @@ for fi in files:
     obs_GC = met['obs_GC']
     # Only consider data within latitude and longitude bounds
     ind = np.where((obs_GC[:,2]>=xlim[0]) & (obs_GC[:,2]<=xlim[1]) & (obs_GC[:,3]>=ylim[0]) & (obs_GC[:,3]<=ylim[1]))
-    if (len(ind[0]) == 0):    # Skip if no data in bounds
+    if (len(ind[0]) == 0):          # Skip if no data in bounds
         continue
-    obs_GC = obs_GC[ind[0],:] # TROPOMI and GEOS-Chem data within bounds
-    KK = met['KK'][ind[0],:]  # Jacobian entries for observations within bounds
-    NN = obs_GC.shape[0]      # Number of observations
+    obs_GC = obs_GC[ind[0],:]       # TROPOMI and GEOS-Chem data within bounds
+    KK = 1e9 * met['KK'][ind[0],:]  # Jacobian entries for observations within bounds [ppb]
+    NN = obs_GC.shape[0]            # Number of observations
 
     # Now lower the sensitivity to BC by 50%
-    # [****Is this something we want to do? Delete these lines?]
+    # ****This makes the k-means clusters less sensitive
     #KK[:,1199:] = KK[:,1199:]/2
     
     # Initialize observation error matrix diagonal entries
@@ -143,9 +143,10 @@ inv_Sa = np.diag(1/emis_error)   # Inverse of prior covariance matrix
 # Solve for posterior scaling factors
 # [****Is that what "ratio" is?]
 ratio = np.linalg.inv(all_part1 + inv_Sa)@all_part2
+xhat = 1 + ratio # xhat = x_A + ratio = 1 + ratio
 
 # Print some statistics
-print('Min:',ratio.min(),'Mean:',ratio.mean(),'Max',ratio.max())
+print('Min:',xhat.min(),'Mean:',xhat.mean(),'Max',xhat.max())
 
 # Dictionary to store results
 # [****But we don't save it out? Delete these lines?]
@@ -161,7 +162,9 @@ nvar = dataset.createDimension('nvar', n_clust)
 nc_all_part1 = dataset.createVariable('all_part1', np.float32,('nvar','nvar'))
 nc_all_part2 = dataset.createVariable('all_part2', np.float32,('nvar'))
 nc_ratio = dataset.createVariable('ratio', np.float32,('nvar'))
+nc_xhat = dataset.createVariable('xhat', np.float32, ('nvar'))
 nc_all_part1[:,:] = all_part1    # [****What is this?]
 nc_all_part2[:] = all_part2      # [****What is this?]
 nc_ratio[:] = ratio              # [****What is this?]
+nc_xhat[:] = xhat
 dataset.close()
