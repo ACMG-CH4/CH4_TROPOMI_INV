@@ -58,6 +58,7 @@ def nearest_loc(loc_query, loc_grid, tolerance=1):
 n_clust = 1199+8
 xlim = [-106.5625,-82.1875];
 ylim = [11,35]
+gamma = 0.25
 
 # Read observational error data
 filename = "/n/holyscratch01/jacob_lab/lshen/CH4/GEOS-Chem/Flexgrid/CPU_mexico_inversion/Step4_inversion_pixel/mean_error.nc"
@@ -142,7 +143,7 @@ inv_Sa = np.diag(1/emis_error)   # Inverse of prior covariance matrix
 
 # Solve for posterior scaling factors
 # [****Is that what "ratio" is?]
-ratio = np.linalg.inv(all_part1 + inv_Sa)@all_part2
+ratio = np.linalg.inv(gamma*all_part1 + inv_Sa)@(gamma*all_part2)
 xhat = 1 + ratio # xhat = x_A + ratio = 1 + ratio
 
 # Print some statistics
