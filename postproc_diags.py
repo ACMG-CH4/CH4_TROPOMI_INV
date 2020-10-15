@@ -34,8 +34,8 @@ def fill_missing_hour(run_dirs_pth, postdir, start_day, first_sim_switch):
     # Process them
     for r in rundirs:
         # Load copied SpeciesConc and LevelEdgeDiags files from posterior simulation
-        copied_file_SC = postdir+'/OutputDir/GEOSChem.SpeciesConc.Copy.'+start_day+'_0000z.nc4'
-        copied_file_LE = postdir+'/OutputDir/GEOSChem.LevelEdgeDiags.Copy.'+start_day+'_0000z.nc4'
+        copied_file_SC = f'{postdir}/OutputDir/GEOSChem.SpeciesConc.Copy.{start_day}_0000z.nc4'
+        copied_file_LE = f'{postdir}/OutputDir/GEOSChem.LevelEdgeDiags.Copy.{start_day}_0000z.nc4'
         if first_sim_switch == 'True':
             # If this is the very first simulation, use data from spinup run instead of posterior simulation
             copied_file_SC = '/n/seasasfs02/dvaron/GEOSChem/spinup_permian/CH4_spinup/run_dirs/CH4_spinup_0000/OutputDir/GEOSChem.SpeciesConc.'+start_day+'_0000z.nc4'
@@ -43,9 +43,9 @@ def fill_missing_hour(run_dirs_pth, postdir, start_day, first_sim_switch):
         copied_data_SC = xr.load_dataset(copied_file_SC)
         copied_data_LE = xr.load_dataset(copied_file_LE)
         # Load output SpeciesConc and LevelEdgeDiags file
-        output_file_SC = run_dirs_pth+'/'+r+'/OutputDir/GEOSChem.SpeciesConc.'+start_day+'_0000z.nc4'
+        output_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
         output_data_SC = xr.load_dataset(output_file_SC)
-        output_file_LE = run_dirs_pth+'/'+r+'/OutputDir/GEOSChem.LevelEdgeDiags.'+start_day+'_0000z.nc4'
+        output_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
         output_data_LE = xr.load_dataset(output_file_LE)
         # Merge output and copied datasets
         merged_data_SC = xr.merge([output_data_SC, copied_data_SC])

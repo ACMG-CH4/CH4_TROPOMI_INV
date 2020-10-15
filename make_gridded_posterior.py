@@ -44,7 +44,7 @@ def make_gridded_posterior(posterior_SF_path, clusters_path, save_path):
     ds_scfac.lat.attrs['long_name'] = 'Latitude'
     ds_scfac.lon.attrs['units'] = 'degrees_east'
     ds_scfac.lon.attrs['long_name'] = 'Longitude'
-    ds_scfac.SF_Nonwetland.attrs['units'] = 'none'
+    ds_scfac.SF_Nonwetland.attrs['units'] = '1'
 
     # Create netcdf
     ds_scfac.to_netcdf(save_path)

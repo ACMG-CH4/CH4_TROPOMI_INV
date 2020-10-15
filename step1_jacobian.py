@@ -645,8 +645,9 @@ if __name__ == '__main__':
     xlim = [-111,-95]
     ylim = [24,39]
     GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
-    GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S'))
-    print('Configured.')
+    GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
+    print('Start:', start)
+    print('End:', end)
 
     # Move to Step1 directory
     #os.chdir(workdir+"Step1_convert_GC")
