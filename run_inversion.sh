@@ -5,8 +5,8 @@
 #SBATCH -p huce_intel
 #SBATCH --mem 4000
 #SBATCH -t 0-03:00
-#SBATCH -o logfiles/inversion_script_%j.out
-#SBATCH -e logfiles/inversion_script_%j.err
+#SBATCH -o run_inversion_%j.out
+#SBATCH -e run_inversion_%j.err
 
 #=======================================================================
 # Configuration
@@ -14,14 +14,18 @@
 NCLUST={CLUSTERS}
 STARTDAY={START}
 ENDDAY={END}
-JACRUNSDIR={RUNDIRS}
-SENSIDIR="./inversion/Sensi"
-GCDATADIR="./inversion/data_GC"
-JACOBIANDIR="./inversion/data_converted"
-CLUSTERSPTH="{MYPATH}/input_data_permian/Clusters_permian_kmeans.nc"
+MYPATH={MY_PATH}
+RUNNAME={RUN_NAME}
+SPINUPDIR="${MYPATH}/${RUNNAME}/spinup_run"
+JACRUNSDIR="${MYPATH}/${RUNNAME}/jacobian_runs"
+POSTRUNDIR="${MYPATH}/${RUNNAME}/posterior_run"
+CLUSTERSPTH="${MYPATH}/input_data_permian/Clusters_permian_kmeans.nc"
+SENSIDIR="./Sensi"
+GCDATADIR="./data_GC"
+JACOBIANDIR="./data_converted"
 
-# This doesn't matter until we want to run posterior simulations after the inversion
-POSTRUNDIR="${JACRUNSDIR}/posterior_run"
+# Only matters for Kalman filter multi-week inversions
+firstsimswitch=true
 
 # Load the Python environment
 # Comment this out for now and instruct users to activate their own Python envs
@@ -30,11 +34,11 @@ POSTRUNDIR="${JACRUNSDIR}/posterior_run"
 
 # Make sure specified paths exist
 if [[ ! -d ${JACRUNSDIR} ]]; then
-    echo "\n${JACRUNSDIR} does not exist. Please fix JACRUNDIR."
+    echo "${JACRUNSDIR} does not exist. Please fix JACRUNDIR."
     exit 1
 fi
-if [[ ! -f ${JCLUSTERSPTH} ]]; then
-    echo "\n${CLUSTERSPTH} does not exist. Please fix CLUSTERSPTH.."
+if [[ ! -f ${CLUSTERSPTH} ]]; then
+    echo "${CLUSTERSPTH} does not exist. Please fix CLUSTERSPTH."
     exit 1
 fi
 
@@ -42,53 +46,73 @@ fi
 # Postprocess the SpeciesConc and LevelEdgeDiags files from GEOS-Chem
 #=======================================================================
 
-# Only matters for Kalman filter multi-week inversions
-firstsimswitch="True"
-
-# Irrelevant unless running posterior simulation after inversion
-postdir="${POSTRUNDIR}/{RUNNAME}_Posterior_0000"
-
-python postproc_diags.py $JACRUNSDIR $postdir $STARTDAY $firstsimswitch; wait
-echo "Postprocessed SpeciesConc and LevelEdgeDiags files, FSS=$firstsimswitch"
+echo "Calling postproc_diags.py, FSS=$firstsimswitch"
+if "$firstsimswitch"; then
+    if [[ ! -d ${SPINUPDIR} ]]; then
+	echo "${SPINUPDIR} does not exist. Please fix SPINUPDIR or set firstsimswitch to False."
+	exit 1
+    fi
+    PREVDIR=$SPINUPDIR
+else
+    PREVDIR=%$POSTRUNDIR
+    if [[ ! -d ${POSTRUNDIR} ]]; then
+	echo "${POSTRUNDIR} does not exist. Please fix POSTRUNDIR."
+	exit 1
+    fi
+fi
+echo "  - Hour 0 for ${STARTDAY} will be obtained from ${PREVDIR}"
+    
+python postproc_diags.py $RUNNAME $JACRUNSDIR $PREVDIR $STARTDAY; wait
+echo "DONE -- postproc_diags.py"
+echo ""
 
 #=======================================================================
 # Calculate GEOS-Chem sensitivities and save to Sensi directory
 #=======================================================================
 
-python calc_sensi.py $STARTDAY $ENDDAY $JACRUNSDIR $SENSIDIR; wait
-echo "Saved GC sensitivity files to $SENSIDIR"
+echo "Calling calc_sensi.py"
+python calc_sensi.py $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
+echo "DONE -- calc_sensi.py"
+echo ""
 
 #=======================================================================
 # Setup GC data directory in workdir
 #=======================================================================
-GCsourcepth="${JACRUNSDIR}/{RUNNAME}_0000/OutputDir"
+GCsourcepth="${JACRUNSDIR}/${RUNNAME}_0000/OutputDir"
 
+echo "Calling setup_GCdatadir.py"
 python setup_GCdatadir.py $STARTDAY $ENDDAY $GCsourcepth $GCDATADIR; wait
-echo "Setup GEOS-Chem data directory for hourly data files"
+echo "DONE -- setup_GCdatadir.py"
+echo ""
 
 #=======================================================================
 # Generate Jacobian matrix files 
 #=======================================================================
-jacstoredir="${JACOBIANDIR}"
-mkdir $jacstoredir
 
-python step1_jacobian.py $STARTDAY $ENDDAY $jacstoredir; wait
-echo "Generated Jacobian matrix files in $jacstoredir"
+echo "Calling jacobian.py"
+python jacobian.py $STARTDAY $ENDDAY; wait
+echo " DONE -- jacobian.py"
+echo ""
 
 #=======================================================================
 # Do inversion
 #=======================================================================
-posteriorSF_outputpath="./inversion_result.nc"
+error="./mean_error_test.nc"
+osteriorSF="./inversion_result.nc"
 
-python step2_invert.py $posteriorSF_outputpath $jacstoredir; wait
-echo "Did inversion and saved results to $posteriorSF_outputpath"
+echo "Calling invert.py"
+python invert.py $NCLUST $JACOBIANDIR $error $posteriorSF; wait
+echo "DONE -- invert.py"
+echo ""
 
 #=======================================================================
 # Create gridded posterior scaling factor netcdf file
 #=======================================================================
-gridded_posterior_path="./gridded_posterior.nc"
+gridded_posterior="./gridded_posterior.nc"
 
-python make_gridded_posterior.py $posteriorSF_outputpath $CLUSTERSPTH $gridded_posterior_path; wait
-echo "Mapped posterior scaling factors to domain grid"
+echo "Calling make_gridded_posterior.py"
+python make_gridded_posterior.py $posteriorSF $CLUSTERSPTH $gridded_posterior; wait
+echo "DONE -- make_gridded_posterior.py"
+echo ""
 
 exit 0

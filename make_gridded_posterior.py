@@ -49,7 +49,7 @@ def make_gridded_posterior(posterior_SF_path, clusters_path, save_path):
     # Create netcdf
     ds_scfac.to_netcdf(save_path)
 
-
+    print("Saved gridded file to {}".format(save_path))
 
 if __name__ == '__main__':
     import sys

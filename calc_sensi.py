@@ -18,7 +18,7 @@ def zero_pad_num_hour(n):
         nstr = '0'+nstr
     return nstr
 
-def calc_sensi(startday, endday, run_dirs_pth, sensi_save_pth):
+def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     '''
     nclust = count the number of clusters
     nlon = count the number of longitudes
@@ -71,14 +71,14 @@ def calc_sensi(startday, endday, run_dirs_pth, sensi_save_pth):
     clust = range(nclust)
 
     for d in days:
-        base_data = xr.load_dataset(run_dirs_pth+'/CH4_Jacobian_0000/OutputDir/GEOSChem.SpeciesConc.'+d+'_0000z.nc4')
+        base_data = xr.load_dataset(run_dirs_pth+'/'+run_name+'_0000/OutputDir/GEOSChem.SpeciesConc.'+d+'_0000z.nc4')
         for h in hours:
             base = base_data['SpeciesConc_CH4'][h,:,:,:]
             Sensi = np.empty((nclust, nlev, nlat, nlon))
             Sensi.fill(np.nan)
             for c in clust:
                 cstr = zero_pad_num(c+1) # Because clusters are numbered 1..nclust
-                pert_data = xr.load_dataset(run_dirs_pth+'/CH4_Jacobian_'+cstr+'/OutputDir/GEOSChem.SpeciesConc.'+d+'_0000z.nc4')
+                pert_data = xr.load_dataset(run_dirs_pth+'/'+run_name+'_'+cstr+'/OutputDir/GEOSChem.SpeciesConc.'+d+'_0000z.nc4')
                 pert = pert_data['SpeciesConc_CH4'][h,:,:,:]
                 sens = pert.values - base.values
                 Sensi[c,:,:,:] = sens
@@ -89,6 +89,7 @@ def calc_sensi(startday, endday, run_dirs_pth, sensi_save_pth):
             Sensi = Sensi.to_dataset()
             Sensi.to_netcdf(sensi_save_pth+'/Sensi_'+d+'_'+zero_pad_num_hour(h)+'.nc')
 
+    print("Saved GEOS-Chem sensitivity files to {}".format(sensi_save_pth))
 
 if __name__ == '__main__':
     import sys
@@ -96,6 +97,7 @@ if __name__ == '__main__':
     startday = sys.argv[1]
     endday = sys.argv[2]
     run_dirs_pth = sys.argv[3]
-    sensi_save_pth = sys.argv[4]
+    run_name = sys.argv[4]
+    sensi_save_pth = sys.argv[5]
 
-    calc_sensi(startday, endday, run_dirs_pth, sensi_save_pth)
+    calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth)
