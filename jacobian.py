@@ -12,24 +12,18 @@ from shapely.geometry import Polygon
 
 # Notes:
 # ======
-# - Manual step 1: Pre-define the GEOS-Chem sensitivities from the perturbation
-#   simulations. Once all perturbation runs are finished, subtract output of
-#   the base run from all of the  perturbation outputs, to obtain one 4D
-#   sensitivity array for each simulation time step 
-#   (one 4D array per hour, in Lu's setup).
-# - Manual step 2: Build the lat_ratio.csv file used to define the lat_ratio
-#   variable.
-# - Not sure why we need both local times and UTC times.
-# - Not clear on how longitudes get transformed into time offsets for computing
-#   local times.
+# - The lat_ratio.csv file used for stratospheric correction is manually defined.
+#   We may want to remove this feature entirely.
+# - Not sure why we need both local times and UTC times. There are several
+#   question-comments about this below.
 # - Lu optimizes scaling factors, so he increases the sensitivities by a factor
-#   of two, due to 1.5 scaling perturbation. This doesn't work if we are
-#   optimizing absolute emissions.
+#   of two, due to the 1.5 scaling perturbation. This is hard-coded and doesn't 
+#   work if we are optimizing absolute emissions.
 # - Not sure about some variables in the cal_weights() and remap()/remap2()
 #   functions:
-# 	- data_type
-# 	- location
-#	- first_2
+# 	    - data_type
+# 	    - location
+#	    - first_2
 # - When Lu computes virtual TROPOMI column from GC data using the TROPOMI prior
 #   and averaging kernel, he does it as the weighted mean mixing ratio [ppb] of
 #   the relevant GC ground cells. Zhen does it as the weighted mean of number
@@ -37,7 +31,6 @@ from shapely.geometry import Polygon
 #   variable -- something like the mass column in addition to PEDGE.
 # - Need to double-check units of Jacobian [mixing ratio, unitless] vs units of
 #   virtual TROPOMI column [ppb] in use_AK_to_GC().
-# - Is TROPP used for anything?
 
 # =============================================================================
 #
@@ -72,25 +65,25 @@ def read_tropomi(filename):
 
     Returns
         met      [dict] : Dictionary of important variables from TROPOMI:
-	    		    - CH4
- 			    - Latitude
-			    - Longitude
-       		            - QA value
- 			    - UTC time
- 			    - Local time
-			    - Averaging kernel
-			    - CH4 prior profile
-			    - Dry air subcolumns
-			    - Latitude bounds
- 			    - Longitude bounds
-			    - Vertical pressure profile
+	    	                - CH4
+ 			                - Latitude
+			                - Longitude
+       		                - QA value
+ 			                - UTC time
+ 			                - Local time
+			                - Averaging kernel
+			                - CH4 prior profile
+			                - Dry air subcolumns
+			                - Latitude bounds
+ 			                - Longitude bounds
+			                - Vertical pressure profile
     """
 
     # Initialize dictionary for TROPOMI data
     met = {}
     
     # Store methane, QA, lat, lon
-    data=xr.open_dataset(filename, group='PRODUCT')
+    data = xr.open_dataset(filename, group='PRODUCT')
     met['methane'] = data['methane_mixing_ratio_bias_corrected'].values[0,:,:]
     met['qa_value'] = data['qa_value'].values[0,:,:]
     met['longitude'] = data['longitude'].values[0,:,:]
@@ -110,7 +103,6 @@ def read_tropomi(filename):
     met['utctime'] = strdate
     
     # Store local time
-    # [****This assumes 24 equal-sized (15-degree) time zones, but is that valid?]
     timeshift = np.array(met['longitude']/15*60, dtype=int)   # Convert to minutes
     localtimes = np.zeros(shape=timeshift.shape, dtype='datetime64[ns]')
     for kk in range(timeshift.shape[0]):
@@ -134,7 +126,7 @@ def read_tropomi(filename):
     data.close()
 
     # Store lat, lon bounds for pixels
-    data=xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/GEOLOCATIONS')
+    data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/GEOLOCATIONS')
     met['longitude_bounds'] = data['longitude_bounds'].values[0,:,:,:]
     met['latitude_bounds'] = data['latitude_bounds'].values[0,:,:,:]
     data.close()
@@ -148,7 +140,6 @@ def read_tropomi(filename):
         pressures[:,:,i] = surface_pressure - i*pressure_interval
     met['pressures'] = pressures
     
-    # Done
     return met    
 
 
@@ -173,36 +164,35 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat
                                  ACE-FTS
     
     Returns
-        met            [dict]  : Dictionary of important variables from
-                                 GEOS-Chem:
-			          - CH4
-			          - Latitude
-			          - Longitude
-			          - PEDGE
-			          - TROPP, if correct_strato=True
-                                  - CH4_adjusted, if correct_strato=True
+        met            [dict]  : Dictionary of important variables from GEOS-Chem:
+			                        - CH4
+                                    - Latitude
+                                    - Longitude
+                                    - PEDGE
+                                    - TROPP, if correct_strato=True
+                                    - CH4_adjusted, if correct_strato=True
     """
     
     # Assemble file paths to GC output collections for input data
     month = int(date[4:6])
-    file_species = "GEOSChem.SpeciesConc."+date+"00z.nc4"        
-    file_pedge = "GEOSChem.LevelEdgeDiags."+date+"00z.nc4"    
-    file_troppause = "GEOSChem.StateMet."+date+"00z.nc4"    
+    file_species = f'GEOSChem.SpeciesConc.{date}00z.nc4'        
+    file_pedge = f'GEOSChem.LevelEdgeDiags.{date}00z.nc4'    
+    file_troppause = f'GEOSChem.StateMet.{date}00z.nc4'    
     
     # Read lat, lon, CH4 from the SpeciecConc collection
-    filename = GC_datadir+'/'+file_species
+    filename = f'{GC_datadir}/{file_species}'
     data = xr.open_dataset(filename)
     LON = data['lon'].values
     LAT = data['lat'].values
-    CH4 = data['SpeciesConc_CH4'].values[0,:,:,:];
+    CH4 = data['SpeciesConc_CH4'].values[0,:,:,:]
     CH4 = CH4*1e9                                    # Convert to ppb
     CH4 = np.einsum('lij->jil', CH4)
     data.close()
 
     # Read PEDGE from the LevelEdgeDiags collection
-    filename = GC_datadir+'/'+file_pedge
+    filename = f'{GC_datadir}/{file_pedge}'
     data = xr.open_dataset(filename)
-    PEDGE = data['Met_PEDGE'].values[0,:,:,:];
+    PEDGE = data['Met_PEDGE'].values[0,:,:,:]
     PEDGE = np.einsum('lij->jil', PEDGE)
     data.close()
     
@@ -210,9 +200,9 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat
     if correct_strato:
         
         # Read tropopause level from StateMet collection
-        filename = GC_datadir+'/'+file_troppause
+        filename = f'{GC_datadir}/{file_troppause}'
         data = xr.open_dataset(filename)
-        TROPP = data['Met_TropLev'].values[0,:,:];
+        TROPP = data['Met_TropLev'].values[0,:,:]
         TROPP = np.einsum('ij->ji', TROPP)
         data.close()
 
@@ -234,19 +224,17 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat
         met['TROPP'] = TROPP
         met['CH4_adjusted'] = CH4_adjusted
     
-    # If need to construct Jacobian, read sensitivity data from GEOS-Chem
-    # perturbation simulations
+    # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
     if use_Sensi:
-        filename = Sensi_datadir+'/Sensi_'+date+'.nc'
+        filename = f'{Sensi_datadir}/Sensi_{date}.nc'
         data = xr.open_dataset(filename)
         Sensi = data['Sensitivities'].values
         Sensi = np.einsum('klji->ijlk', Sensi)
         data.close()
         # Now adjust the Sensitivity
-        Sensi = Sensi*2              # Because we perturb the emissions by 50% [****Only makes sense if optimize scale factors]
+        Sensi = Sensi*2              # Because we perturb the emissions by 50% [****hard-coded; only makes sense if optimize scale factors]
         met['Sensi'] = Sensi
 
-    # Done
     return met
 
 
@@ -276,8 +264,7 @@ def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato
 
 def cal_weights(Sat_p, GC_p):
     """
-    Calculate pressure weights for TROPOMI & GC
-    [****Need more detailed description. What exactly does the output dictionary look like?]
+    Calculate pressure weights for TROPOMI & GEOS-Chem on a joint, uneven grid
 
     Arguments
         Sat_p   [float]    : Pressure edge from TROPOMI (13)          <--- 13-1 = 12 pressure levels
@@ -285,13 +272,12 @@ def cal_weights(Sat_p, GC_p):
 
     Returns
         weights [dict]     : Pressure weights
-"""
+    """
 
-    # Step 1: Combine Sat_p and GC_p 
-    #         [****Possible to do this in fewer lines?]
-    Com_p = np.zeros(len(Sat_p)+len(GC_p));                     # <--- 61-1 = 60 pressure levels
+    # Combine Sat_p and GC_p into joint, uneven vertical grid
+    Com_p = np.zeros(len(Sat_p)+len(GC_p))                     # <--- 61-1 = 60 pressure levels
     Com_p.fill(np.nan)
-    data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int); 
+    data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int) 
     data_type.fill(-99)
     location = []
     i=0;j=0;k=0
@@ -317,7 +303,7 @@ def cal_weights(Sat_p, GC_p):
             data_type[k] = 2
             j=j+1; k=k+1
     
-    # Step 2: Find the first level of GC
+    # Find the first level of GC
     first_2 = -99
     for i in range(len(Sat_p)+len(GC_p)-1):
         if data_type[i] == 2:
@@ -331,7 +317,6 @@ def cal_weights(Sat_p, GC_p):
     weights['location'] = location
     weights['first_2'] = first_2
     
-    # Done
     return weights
 
 
@@ -343,16 +328,16 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
 
     Arguments
         GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
-        data_type [int]     : ???
+        data_type [int]     : ****
         Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : ???
-        first_2   [int]     : ???
+        location  [int]     : ****
+        first_2   [int]     : ****
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
     """
     
-    # ****Step 3: ???
+    # ****
     conc = np.zeros(len(Com_p)-1,); conc.fill(np.nan)
     k=0
     for i in range(first_2, len(Com_p)-1):
@@ -362,7 +347,7 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
     if first_2 > 0:
         conc[:first_2] = conc[first_2]
     
-    # Step 4: Calculate the weighted mean methane for each layer
+    # Calculate the weighted mean methane for each layer
     delta_p = Com_p[:-1] - Com_p[1:]
     Sat_CH4 = np.zeros(12); Sat_CH4.fill(np.nan)
     for i in range(len(location)-1):
@@ -372,7 +357,6 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
         fenmu = sum(delta_p[start:end])
         Sat_CH4[i] = fenzi/fenmu   
     
-    # Done
     return Sat_CH4
 
 
@@ -383,17 +367,17 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
     Remap GEOS-Chem sensitivity data (from perturbation simulations) to TROPOMI vertical grid.
 
     Arguments
-        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster)****check dim order
-        data_type [int]     : ???
+        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster)****double-check dim order
+        data_type [int]     : ****
         Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : ???
-        first_2   [int]     : ???
+        location  [int]     : ****
+        first_2   [int]     : ****
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
     """
     
-    # ****Step 3: ???
+    # ****
     MM = Sensi.shape[1]
     conc = np.zeros((len(Com_p)-1, MM))
     conc.fill(np.nan)
@@ -405,7 +389,7 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
     if first_2 > 0:
         conc[:first_2,:] = conc[first_2,:]
     
-    # Step 4: Calculate the weighted mean methane for each layer
+    # Calculate the weighted mean methane for each layer
     delta_p = Com_p[:-1] - Com_p[1:]
     delta_ps = np.transpose(np.tile(delta_p, (MM,1)))
     Sat_CH4 = np.zeros((12, MM)); Sat_CH4.fill(np.nan)
@@ -416,7 +400,6 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
         fenmu = np.sum(delta_p[start:end])
         Sat_CH4[i,:] = fenzi/fenmu
     
-    # Done
     return Sat_CH4
 
 
@@ -462,14 +445,13 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
 
     Returns
         result         [dict]       : Dictionary with one or two fields:
- 	   	 		        - obs_GC : GEOS-Chem and TROPOMI methane
-                                                   data
-	 					     - TROPOMI methane
-						     - GC methane
-						     - TROPOMI lat, lon
-						     - TROPOMI lat index, lon index
-				      If use_Sensi=True, also include:
-				        - KK     : Jacobian matrix
+ 	   	 		                        - obs_GC : GEOS-Chem and TROPOMI methane data
+	 					                            - TROPOMI methane
+						                            - GC methane
+						                            - TROPOMI lat, lon
+						                            - TROPOMI lat index, lon index
+				                      If use_Sensi=True, also include:
+				                        - KK     : Jacobian matrix
     """
     
     # Read TROPOMI data
@@ -509,7 +491,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
         timeshift = 0 # Now I use UTC time instead of local time [****Why?]
         localtime = TROPOMI['utctime'][iSat] + np.timedelta64(timeshift, 'm') # local time
         localtime = pd.to_datetime(str(localtime))
-        strdate = localtime.round('60min').strftime("%Y%m%d_%H")        
+        strdate = localtime.round('60min').strftime('%Y%m%d_%H')        
         all_strdate.append(strdate)
     all_strdate = list(set(all_strdate))
 
@@ -530,13 +512,13 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
         timeshift = 0
         localtime = TROPOMI['utctime'][iSat]+np.timedelta64(timeshift,'m')    # local time
         localtime = pd.to_datetime(str(localtime))
-        strdate = localtime.round('60min').strftime("%Y%m%d_%H")        
+        strdate = localtime.round('60min').strftime('%Y%m%d_%H')        
         GC = all_date_GC[strdate]
                 
         # Find GC lats & lons closest to the corners of the TROPOMI pixel
         longitude_bounds = TROPOMI['longitude_bounds'][iSat,jSat,:]
         latitude_bounds = TROPOMI['latitude_bounds'][iSat,jSat,:]
-        corners_lon = [];
+        corners_lon = []
         corners_lat = []
         for k in range(4):
             iGC = nearest_loc(longitude_bounds[k], GC['lon'])
@@ -546,8 +528,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
         GC_ij = [(x,y) for x in set(corners_lon) for y in set(corners_lat)]
         GC_grids = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
         
-        # Compute the overlapping area between the TROPOMI pixel and GC grid
-        # cells it touches
+        # Compute the overlapping area between the TROPOMI pixel and GC grid cells it touches
         overlap_area = np.zeros(len(GC_grids))
         dlon = GC['lon'][1]-GC['lon'][0]
         dlat = GC['lat'][1]-GC['lat'][0]
@@ -564,8 +545,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
             if p2.intersects(p0):
                   overlap_area[ipixel] = p0.intersection(p2).area
         
-        # If there is no overlap between GC and TROPOMI,
-        # skip to next observation:
+        # If there is no overlap between GC and TROPOMI, skip to next observation:
         if sum(overlap_area) == 0:
             continue                  
 
@@ -573,8 +553,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
         #       Map GEOS-Chem to TROPOMI observation space
         # =======================================================
         
-        # Otherwise, initialize tropomi virtual xch4 and virtual sensitivity
-        # as zero
+        # Otherwise, initialize tropomi virtual xch4 and virtual sensitivity as zero
         GC_base_posteri = 0   # virtual tropomi xch4
         GC_base_sensi = 0     # virtual tropomi sensitivity
         
@@ -602,20 +581,17 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
             # Convert ppb to mol m-2
             Sat_CH4_2 = Sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
-            # Derive the column-averaged XCH4 that TROPOMI would see over
-            # this ground cell
+            # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             tropomi_sees_ipixel = sum(priori + AK * (Sat_CH4_2-priori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             
-            # Weight by overlapping area (to be divided out later) and add
-            # to sum
+            # Weight by overlapping area (to be divided out later) and add to sum
             GC_base_posteri += overlap_area[ipixel] * tropomi_sees_ipixel  # ppb m2
 
             # If building Jacobian matrix from GC perturbation simulation
             # sensitivity data:
             if use_Sensi:
                 
-                # Get GC perturbation sensitivities at this lat/lon, for all
-                # vertical levels and clusters
+                # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and clusters
                 Sensi = GC['Sensi'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
@@ -627,16 +603,14 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
                 # Tile the TROPOMI dry air subcolumns
                 dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_clust,1)))   # mol m-2
                 
-                # Derive the change in column-averaged XCH4 that TROPOMI would
-                # see over this ground cell
+                # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
                 ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
                 
-                # Weight by overlapping area (to be divided out later) and
-                # add to sum
+                # Weight by overlapping area (to be divided out later) and add to sum
                 GC_base_sensi += overlap_area[ipixel] * ap  # m2
 
-        # Compute virtual TROPOMI observation as weighted mean by overlapping
-        #  area (i.e., need to divide out area [m2] from the previous step)
+        # Compute virtual TROPOMI observation as weighted mean by overlapping area
+        # i.e., need to divide out area [m2] from the previous step
         virtual_tropomi = GC_base_posteri/sum(overlap_area)
  
         # Save real and virtual TROPOMI data                        
@@ -662,7 +636,6 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
     if use_Sensi:
         result['KK'] = temp_KK
     
-    # Done    
     return result
 
 
@@ -679,17 +652,17 @@ if __name__ == '__main__':
     endday = sys.argv[2]
  
     # Reformat start and end days for datetime in configuration
-    start = startday[0:4]+'-'+startday[4:6]+'-'+startday[6:8]+' 00:00:00'
-    end = endday[0:4]+'-'+endday[4:6]+'-'+endday[6:8]+' 23:59:59'
+    start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
+    end = f'{endday[0:4]}-{endday[4:6]}-{endday[6:8]} 23:59:59'
 
     # Configuration
     use_Sensi = True
     correct_strato = False
-    workdir = './'
-    Sensi_datadir = workdir+"Sensi/"
-    Sat_datadir = workdir+"data_TROPOMI/"
-    GC_datadir = workdir+"data_GC/"
-    outputdir = workdir+'data_converted/'
+    workdir = '.'
+    Sensi_datadir = f'{workdir}/Sensi'
+    Sat_datadir = f'{workdir}/data_TROPOMI'
+    GC_datadir = f'{workdir}/data_GC'
+    outputdir = f'{workdir}/data_converted'
     n_clust = 235+8
     xlim = [-111,-95]
     ylim = [24,39]
@@ -700,7 +673,7 @@ if __name__ == '__main__':
 
     # Get TROPOMI data filenames for the desired date range
     print(Sat_datadir)
-    allfiles = glob.glob(Sat_datadir+'*.nc')
+    allfiles = glob.glob(f'{Sat_datadir}/*.nc')
     Sat_files = []
     for index in range(len(allfiles)):
         filename = allfiles[index]
@@ -711,10 +684,10 @@ if __name__ == '__main__':
         if ((strdate2 >= GC_startdate) and (strdate2 <= GC_enddate)):
             Sat_files.append(filename)
     Sat_files.sort()
-    print('Found',len(Sat_files),'TROPOMI data files.')
+    print('Found', len(Sat_files), 'TROPOMI data files.')
 
-    # Map GEOS-Chem to TROPOMI observation space;
-    # also return Jacobian matrix if use_Sensi=True
+    # Map GEOS-Chem to TROPOMI observation space
+    # Also return Jacobian matrix if use_Sensi=True
     for filename in Sat_files:
         
         # Check if TROPOMI file has already been processed
@@ -724,15 +697,15 @@ if __name__ == '__main__':
         date = re.split('\.',temp)[0]
         
         # If not yet processed, run use_AK_to_GC()
-        if ~os.path.isfile(outputdir+date+'_GCtoTROPOMI.pkl'):
+        if ~os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
             if correct_strato:
-                df = pd.read_csv("./lat_ratio.csv", index_col=0)
+                df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
                 lat_ratio = df.values
                 result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
             else:
                 print('Running use_AK_to_GC().')
                 result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir)
-        save_obj(result, outputdir+date+'_GCtoTROPOMI.pkl')
+        save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
 
-    print("Wrote files to {}".format(outputdir))
+    print(f'Wrote files to {outputdir}')

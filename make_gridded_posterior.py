@@ -5,10 +5,10 @@ import numpy as np
 
 def make_gridded_posterior(posterior_SF_path, clusters_path, save_path):
     '''
-    Lu's inversion code outputs the posterior scaling factors as a vector (.nc file)
-    HEMCO wants the scaling factors as a gridded product, by latitude/longitude
+    The UMI code outputs the posterior scaling factors as a vector (.nc file).
+    HEMCO wants the scaling factors as a gridded product, by latitude/longitude.
     This script uses the posterior vector file and the clusters file to generate a gridded
-    version of the posterior scaling factors
+    version of the posterior scaling factors.
 
     Arguments
        posterior_SF_path [str] : path to the posterior scaling factors from an inversion
