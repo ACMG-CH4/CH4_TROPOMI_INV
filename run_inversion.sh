@@ -71,7 +71,7 @@ echo ""
 #=======================================================================
 
 echo "Calling calc_sensi.py"
-python calc_sensi.py $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
+python calc_sensi.py $NCLUST $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
 echo "DONE -- calc_sensi.py"
 echo ""
 

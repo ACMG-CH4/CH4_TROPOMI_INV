@@ -18,17 +18,18 @@ def zero_pad_num_hour(n):
         nstr = '0'+nstr
     return nstr
 
-def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
+def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     '''
     Loops over output data from GEOS-Chem perturbation simulations to compute sensitivities 
     for the Jacobian matrix.
 
     Arguments
-        startday       [str] : first day of inversion period; formatted YYYYMMDD
-        endday         [str] : last day of inversion period; formatted YYYYMMDD
-        run_dirs_pth   [str] : path to directory containing GC Jacobian run directories
-        run_name       [str] : simulation run name; e.g. 'CH4_Jacobian'
-        sensi_save_pth [str] : path to save the sensitivity data
+        nclust         [int] : Number of clusters / state vector elements
+        startday       [str] : First day of inversion period; formatted YYYYMMDD
+        endday         [str] : Last day of inversion period; formatted YYYYMMDD
+        run_dirs_pth   [str] : Path to directory containing GC Jacobian run directories
+        run_name       [str] : Simulation run name; e.g. 'CH4_Jacobian'
+        sensi_save_pth [str] : Path to save the sensitivity data
 
     Resulting 'Sensi' files look like:
 
@@ -45,12 +46,11 @@ def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     Pseudocode summary:
     
         nclust = count the number of clusters
-        nlon = count the number of longitudes
-        nlat = count the number of latitudes
-        nlev = count the number of vertical levels
-        
         for each day:
             load the base run SpeciesConc file
+            nlon = count the number of longitudes
+            nlat = count the number of latitudes
+            nlev = count the number of vertical levels
             for each hour:
                 base = extract the base run data for the hour
                 Sensi = np.empty((nlon, nlat, nlev, nclust))
@@ -61,14 +61,7 @@ def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
                     sens = pert - base
                     Sensi[:,:,:,cluster] = sens
                 save Sensi as netcdf with appropriate coordinate variables
-    
     '''
-
-    # Configuration [****hard-coded]
-    nclust = 235+8
-    nlon = 52
-    nlat = 61
-    nlev = 47
 
     # Make date range
     days = []
@@ -88,6 +81,10 @@ def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     for d in days:
         # Load the base run SpeciesConc file
         base_data = xr.load_dataset(f'{run_dirs_pth}/{run_name}_0000/OutputDir/GEOSChem.SpeciesConc.{d}_0000z.nc4')
+        # Count nlat, nlon, nlev
+        nlon = len(base_data['lon']) # 52
+        nlat = len(base_data['lat']) # 61
+        nlev = len(base_data['lev']) # 47
         # For each hour
         for h in hours:
             # Get the base run data for the hour
@@ -114,7 +111,7 @@ def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
             Sensi = Sensi.to_dataset()
             Sensi.to_netcdf(f'{sensi_save_pth}/Sensi_{d}_{zero_pad_num_hour(h)}.nc')
 
-    print("Saved GEOS-Chem sensitivity files to {}".format(sensi_save_pth))
+    print(f'Saved GEOS-Chem sensitivity files to {sensi_save_pth}')
 
 
 
@@ -123,10 +120,11 @@ def calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth):
 if __name__ == '__main__':
     import sys
 
-    startday = sys.argv[1]
-    endday = sys.argv[2]
-    run_dirs_pth = sys.argv[3]
-    run_name = sys.argv[4]
-    sensi_save_pth = sys.argv[5]
+    nclust = sys.argv[1]
+    startday = sys.argv[2]
+    endday = sys.argv[3]
+    run_dirs_pth = sys.argv[4]
+    run_name = sys.argv[5]
+    sensi_save_pth = sys.argv[6]
 
-    calc_sensi(startday, endday, run_dirs_pth, run_name, sensi_save_pth)
+    calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)

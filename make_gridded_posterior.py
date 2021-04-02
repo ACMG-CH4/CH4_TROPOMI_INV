@@ -5,7 +5,7 @@ import numpy as np
 
 def make_gridded_posterior(posterior_SF_path, clusters_path, save_path):
     '''
-    The UMI code outputs the posterior scaling factors as a vector (.nc file).
+    The UMI code outputs the posterior scaling factors as a vector (in a .nc file).
     HEMCO wants the scaling factors as a gridded product, by latitude/longitude.
     This script uses the posterior vector file and the clusters file to generate a gridded
     version of the posterior scaling factors.
@@ -49,7 +49,7 @@ def make_gridded_posterior(posterior_SF_path, clusters_path, save_path):
     # Create netcdf
     ds_scfac.to_netcdf(save_path)
 
-    print("Saved gridded file to {}".format(save_path))
+    print(f'Saved gridded file to {save_path}')
 
 if __name__ == '__main__':
     import sys

@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 from sklearn.cluster import KMeans
 
-def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_max, buffer_deg=5, land_threshold=0.25, n_clust=8):
+def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_max, buffer_deg=5, land_threshold=0.25, k_clust=8):
     '''
     Generates the cluster file for an analytical inversion.
     
@@ -15,7 +15,7 @@ def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_m
         lon_max        [float] : Maximum longitude
         buffer_deg     [float] : Width of k-means buffer area in degrees
         land_threshold [float] : Minimum land fraction to include pixel as cluster
-        nclust         [int]   : Number of clusters for k-means
+        k_clust         [int]   : Number of clusters for k-means
 
     Returns
         ds_clusters    []      : xarray dataset containing clusters field formatted for HEMCO
@@ -59,7 +59,7 @@ def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_m
     
     # K-means
     X = np.array(coords)
-    kmeans = KMeans(n_clusters=n_clust, random_state=0).fit(X)
+    kmeans = KMeans(n_clusters=k_clust, random_state=0).fit(X)
     
     # Assign pixels to clusters
     highres_cluster_max = np.max(clust.values)
