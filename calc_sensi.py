@@ -120,7 +120,7 @@ def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
 if __name__ == '__main__':
     import sys
 
-    nclust = sys.argv[1]
+    nclust = int(sys.argv[1])
     startday = sys.argv[2]
     endday = sys.argv[3]
     run_dirs_pth = sys.argv[4]
