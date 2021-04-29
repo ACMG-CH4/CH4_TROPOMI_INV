@@ -23,6 +23,7 @@ CLUSTERSPTH="${MYPATH}/input_data_permian/Clusters_permian_kmeans.nc"
 SENSIDIR="./Sensi"
 GCDATADIR="./data_GC"
 JACOBIANDIR="./data_converted"
+TROPOMIDIR="./data_TROPOMI"
 
 # Only matters for Kalman filter multi-week inversions
 firstsimswitch=true
@@ -90,7 +91,7 @@ echo ""
 #=======================================================================
 
 echo "Calling jacobian.py"
-python jacobian.py $STARTDAY $ENDDAY; wait
+python jacobian.py $STARTDAY $ENDDAY $TROPOMIDIR $FETCHTROPOMI; wait
 echo " DONE -- jacobian.py"
 echo ""
 
