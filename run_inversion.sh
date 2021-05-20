@@ -25,6 +25,10 @@ GCDATADIR="./data_GC"
 JACOBIANDIR="./data_converted"
 TROPOMIDIR="./data_TROPOMI"
 
+# Download TROPOMI data. Disable this setting if rerunning for a time period
+# to avoid redownloading existing data
+FETCHTROPOMI=true
+
 # Only matters for Kalman filter multi-week inversions
 firstsimswitch=true
 
