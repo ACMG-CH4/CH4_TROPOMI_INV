@@ -103,7 +103,7 @@ echo ""
 # Do inversion
 #=======================================================================
 error="./mean_error_test.nc"
-osteriorSF="./inversion_result.nc"
+posteriorSF="./inversion_result.nc"
 
 echo "Calling invert.py"
 python invert.py $NCLUST $JACOBIANDIR $error $posteriorSF; wait
