@@ -1,6 +1,8 @@
 import numpy as np
 import xarray as xr
 import datetime
+from joblib import Parallel, delayed
+
 
 def zero_pad_num(n):
     nstr = str(n)
@@ -86,7 +88,7 @@ def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
         nlat = len(base_data['lat']) # 61
         nlev = len(base_data['lev']) # 47
         # For each hour
-        for h in hours:
+        def process(h):
             # Get the base run data for the hour
             base = base_data['SpeciesConc_CH4'][h,:,:,:]
             # Initialize sensitivities array
@@ -111,6 +113,7 @@ def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
             Sensi = Sensi.to_dataset()
             Sensi.to_netcdf(f'{sensi_save_pth}/Sensi_{d}_{zero_pad_num_hour(h)}.nc')
 
+        results = Parallel(n_jobs=-1) (delayed(process)(hour) for hour in hours)
     print(f'Saved GEOS-Chem sensitivity files to {sensi_save_pth}')
 
 

@@ -680,13 +680,11 @@ def download_TROPOMI(startdate, enddate):
                 continue
             init_month=1
             final_month=12
-            print(year, start_year, start_month, end_month)
             if year==int(start_year):
                 # only get desired months from incomplete years
                 init_month=int(start_month)
             if year==int(end_year):
                 final_month=int(end_month)
-            print(init_month, final_month)
             for month in range(init_month, final_month+1):
                 # skip months with definite no data
                 if year==2018 and month<4:
@@ -710,7 +708,6 @@ def download_TROPOMI(startdate, enddate):
                     final_day=int(end_day)
 
                 for day in range(init_day, final_day+1):
-                    print(year, month, day)
                     # skip days with definite no data
                     if year==2018 and month==4 and day<30:
                         print('Skipping TROPOMI data download for ', str(year),
