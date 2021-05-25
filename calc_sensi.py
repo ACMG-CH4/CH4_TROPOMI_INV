@@ -18,18 +18,19 @@ def zero_pad_num_hour(n):
         nstr = '0'+nstr
     return nstr
 
-def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
+def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     '''
     Loops over output data from GEOS-Chem perturbation simulations to compute sensitivities 
     for the Jacobian matrix.
 
     Arguments
-        nclust         [int] : Number of clusters / state vector elements
-        startday       [str] : First day of inversion period; formatted YYYYMMDD
-        endday         [str] : Last day of inversion period; formatted YYYYMMDD
-        run_dirs_pth   [str] : Path to directory containing GC Jacobian run directories
-        run_name       [str] : Simulation run name; e.g. 'CH4_Jacobian'
-        sensi_save_pth [str] : Path to save the sensitivity data
+        nclust         [int]   : Number of clusters / state vector elements
+        perturbation   [float] : Size of perturbation (e.g., 0.5)
+        startday       [str]   : First day of inversion period; formatted YYYYMMDD
+        endday         [str]   : Last day of inversion period; formatted YYYYMMDD
+        run_dirs_pth   [str]   : Path to directory containing GC Jacobian run directories
+        run_name       [str]   : Simulation run name; e.g. 'CH4_Jacobian'
+        sensi_save_pth [str]   : Path to save the sensitivity data
 
     Resulting 'Sensi' files look like:
 
@@ -45,7 +46,6 @@ def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
 
     Pseudocode summary:
     
-        nclust = count the number of clusters
         for each day:
             load the base run SpeciesConc file
             nlon = count the number of longitudes
@@ -101,7 +101,7 @@ def calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
                 # Get the data for the current hour
                 pert = pert_data['SpeciesConc_CH4'][h,:,:,:]
                 # Compute and store the sensitivities
-                sens = pert.values - base.values
+                sens = (pert.values - base.values)/perturbation
                 Sensi[c,:,:,:] = sens
             # Save Sensi as netcdf with appropriate coordinate variables
             Sensi = xr.DataArray(Sensi, 

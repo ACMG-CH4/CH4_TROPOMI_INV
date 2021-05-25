@@ -12,6 +12,7 @@ from shapely.geometry import Polygon
 
 # Notes:
 # ======
+# - FIXED HARD-CODED PERTURBATION THING
 # - The lat_ratio.csv file used for stratospheric correction is manually defined.
 #   We may want to remove this feature entirely.
 # - Not sure why we need both local times and UTC times. There are several
@@ -232,7 +233,6 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat
         Sensi = np.einsum('klji->ijlk', Sensi)
         data.close()
         # Now adjust the Sensitivity
-        Sensi = Sensi*2              # Because we perturb the emissions by 50% [****hard-coded; only makes sense if optimize scale factors]
         met['Sensi'] = Sensi
 
     return met
