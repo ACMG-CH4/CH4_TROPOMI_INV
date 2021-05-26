@@ -20,14 +20,13 @@ def load_obj(name):
         return pickle.load(f)
 
 
-def do_inversion(n_clust, jacobian_dir, output_path, lon_min, lon_max, lat_min, lat_max, prior_err=0.5, obs_err=15, gamma=0.25):
+def do_inversion(n_clust, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err=0.5, obs_err=15, gamma=0.25):
     '''
     After running jacobian.py, use this script to perform the inversion and save out results.
 
     Arguments
         n_clust      [int]   : Number of clusters (state vector elements)
         jacobian_dir [str]   : Directory where the data from jacobian.py are stored
-        output_path  [str]   : Output path for inversion results
         lon_min      [float] : Minimum longitude
         lon_max      [float] : Maximum longitude
         lat_min      [float] : Minimum latitude
@@ -43,9 +42,6 @@ def do_inversion(n_clust, jacobian_dir, output_path, lon_min, lon_max, lat_min, 
         all_part2    [float] : K^T*inv(S_o)*(y-K*xA) [part of inversion equation]
 
     '''
-
-    # Make sure nclust input is an integer
-    n_clust = int(n_clust)
 
     # Need to ignore data in the GEOS-Chem buffer zone
     # Shave off one degree of latitude/longitude from each side of the domain
@@ -163,7 +159,7 @@ if __name__ == '__main__':
     output_path = sys.argv[10]
 
     # Run the inversion code
-    out = do_inversion(n_clust, jacobian_dir, output_path, lon_min, lon_max, lat_min, lat_max, prior_err, obs_err, gamma)
+    out = do_inversion(n_clust, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err, obs_err, gamma)
     xhat = out[0]
     ratio = out[1]
     all_part1 = out[2]

@@ -102,17 +102,25 @@ echo ""
 #=======================================================================
 # Do inversion
 #=======================================================================
-error="./mean_error_test.nc"
-posteriorSF="./inversion_result.nc"
+
+# New inputs (for Permian)
+LON_MIN=-111
+LON_MAX=-95
+LAT_MIN=25
+LAT_MAX=39
+PRIOR_ERR=0.5
+OBS_ERR=15
+GAMMA=0.25
 
 echo "Calling invert.py"
-python invert.py $NCLUST $JACOBIANDIR $error $posteriorSF; wait
+python invert.py $NCLUST $JACOBIANDIR $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
 echo "DONE -- invert.py"
 echo ""
 
 #=======================================================================
 # Create gridded posterior scaling factor netcdf file
 #=======================================================================
+posteriorSF="./inversion_result.nc"
 gridded_posterior="./gridded_posterior.nc"
 
 echo "Calling make_gridded_posterior.py"

@@ -15,7 +15,7 @@ def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_m
         lon_max        [float] : Maximum longitude
         buffer_deg     [float] : Width of k-means buffer area in degrees
         land_threshold [float] : Minimum land fraction to include pixel as cluster
-        k_clust         [int]   : Number of clusters for k-means
+        k_clust        [int]   : Number of clusters for k-means
 
     Returns
         ds_clusters    []      : xarray dataset containing clusters field formatted for HEMCO
