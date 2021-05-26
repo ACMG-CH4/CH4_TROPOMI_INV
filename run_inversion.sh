@@ -111,16 +111,16 @@ LAT_MAX=39
 PRIOR_ERR=0.5
 OBS_ERR=15
 GAMMA=0.25
+posteriorSF="./inversion_result.nc"
 
 echo "Calling invert.py"
-python invert.py $NCLUST $JACOBIANDIR $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
+python invert.py $NCLUST $JACOBIANDIR $posteriorSF $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
 echo "DONE -- invert.py"
 echo ""
 
 #=======================================================================
 # Create gridded posterior scaling factor netcdf file
 #=======================================================================
-posteriorSF="./inversion_result.nc"
 gridded_posterior="./gridded_posterior.nc"
 
 echo "Calling make_gridded_posterior.py"
