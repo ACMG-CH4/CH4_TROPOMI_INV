@@ -75,8 +75,11 @@ echo ""
 # Calculate GEOS-Chem sensitivities and save to Sensi directory
 #=======================================================================
 
+# Temporary input definition
+PERTURBATION=0.5
+
 echo "Calling calc_sensi.py"
-python calc_sensi.py $NCLUST $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
+python calc_sensi.py $NCLUST $PERTURBATION $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
 echo "DONE -- calc_sensi.py"
 echo ""
 
