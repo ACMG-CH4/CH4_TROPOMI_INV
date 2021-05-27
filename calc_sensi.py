@@ -124,10 +124,11 @@ if __name__ == '__main__':
     import sys
 
     nclust = int(sys.argv[1])
-    startday = sys.argv[2]
-    endday = sys.argv[3]
-    run_dirs_pth = sys.argv[4]
-    run_name = sys.argv[5]
-    sensi_save_pth = sys.argv[6]
+    perturbation = float(sys.argv[2])
+    startday = sys.argv[3]
+    endday = sys.argv[4]
+    run_dirs_pth = sys.argv[5]
+    run_name = sys.argv[6]
+    sensi_save_pth = sys.argv[7]
 
-    calc_sensi(nclust, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
+    calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
