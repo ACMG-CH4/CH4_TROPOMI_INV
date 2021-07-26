@@ -88,6 +88,22 @@ def make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_m
 
     # Save
     if save_pth:
+        print("Saving file {}".format(save_pth))
         ds_clusters.to_netcdf(save_pth)
     
     return ds_clusters
+
+if __name__ == '__main__':
+    import sys
+
+    land_cover_pth = sys.argv[1]
+    save_pth = sys.argv[2]
+    lat_min = float(sys.argv[3])
+    lat_max = float(sys.argv[4])
+    lon_min = float(sys.argv[5])
+    lon_max = float(sys.argv[6])
+    buffer_deg = float(sys.argv[7])
+    land_threshold = float(sys.argv[8])
+    k_clust = int(sys.argv[9])
+    
+    make_cluster_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_max, buffer_deg, land_threshold, k_clust)
