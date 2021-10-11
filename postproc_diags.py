@@ -1,6 +1,8 @@
 import datetime
 import xarray as xr
 import os
+from joblib import Parallel, delayed
+
 
 def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
     '''
@@ -37,7 +39,7 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
     rundirs = [r for r in contents if run_name in r]
 
     # Process them
-    for r in rundirs:
+    def process(r):
         # Load hour zero from end of spinup run or previous posterior simulation
         prev_file_SC = f'{prev_run_pth}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
         prev_file_LE = f'{prev_run_pth}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
@@ -45,20 +47,23 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
         prev_data_LE = xr.load_dataset(prev_file_LE)
         
         # Load output SpeciesConc and LevelEdgeDiags file
-        output_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
+        output_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0005z.nc4'
         output_data_SC = xr.load_dataset(output_file_SC)
-        output_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
+        output_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0005z.nc4'
         output_data_LE = xr.load_dataset(output_file_LE)
         
         # Merge output and copied datasets
         merged_data_SC = xr.merge([output_data_SC, prev_data_SC])
         merged_data_LE = xr.merge([output_data_LE, prev_data_LE])
         
-        # Replace original files that were missing the first hour 
-        merged_data_SC.to_netcdf(output_file_SC)
-        merged_data_LE.to_netcdf(output_file_LE)
+        # Replace original files that were missing the first hour
+        final_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
+        final_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
+        merged_data_SC.to_netcdf(final_file_SC)
+        merged_data_LE.to_netcdf(final_file_LE)
 
-
+    results = Parallel(n_jobs=-1)(delayed(process)(run) for run in rundirs)
+        
 if __name__ == '__main__':
     import sys
 
@@ -66,5 +71,5 @@ if __name__ == '__main__':
     run_dirs_pth = sys.argv[2]
     prev_run_pth = sys.argv[3]
     start_day = sys.argv[4]
-
+    
     fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day)

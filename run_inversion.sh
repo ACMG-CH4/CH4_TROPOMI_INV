@@ -2,9 +2,8 @@
 
 #SBATCH -n 1
 #SBATCH -N 1
-#SBATCH -p huce_intel
-#SBATCH --mem 4000
 #SBATCH -t 0-03:00
+#SBATCH --mem 4000
 #SBATCH -o run_inversion_%j.out
 #SBATCH -e run_inversion_%j.err
 
@@ -19,10 +18,15 @@ RUNNAME={RUN_NAME}
 SPINUPDIR="${MYPATH}/${RUNNAME}/spinup_run"
 JACRUNSDIR="${MYPATH}/${RUNNAME}/jacobian_runs"
 POSTRUNDIR="${MYPATH}/${RUNNAME}/posterior_run"
-CLUSTERSPTH="${MYPATH}/input_data_permian/Clusters_permian_kmeans.nc"
+CLUSTERSPTH="${MYPATH}/input_data/Clusters_permian_kmeans.nc"
 SENSIDIR="./Sensi"
 GCDATADIR="./data_GC"
 JACOBIANDIR="./data_converted"
+TROPOMIDIR="./data_TROPOMI"
+
+# Download TROPOMI data. Disable this setting if rerunning for a time period
+# to avoid redownloading existing data
+FETCHTROPOMI=true
 
 # Only matters for Kalman filter multi-week inversions
 firstsimswitch=true
@@ -93,7 +97,7 @@ echo ""
 #=======================================================================
 
 echo "Calling jacobian.py"
-python jacobian.py $STARTDAY $ENDDAY; wait
+python jacobian.py $STARTDAY $ENDDAY $TROPOMIDIR $FETCHTROPOMI; wait
 echo " DONE -- jacobian.py"
 echo ""
 
@@ -109,16 +113,16 @@ LAT_MAX=39
 PRIOR_ERR=0.5
 OBS_ERR=15
 GAMMA=0.25
+posteriorSF="./inversion_result.nc"
 
 echo "Calling invert.py"
-python invert.py $NCLUST $JACOBIANDIR $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
+python invert.py $NCLUST $JACOBIANDIR $posteriorSF $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
 echo "DONE -- invert.py"
 echo ""
 
 #=======================================================================
 # Create gridded posterior scaling factor netcdf file
 #=======================================================================
-posteriorSF="./inversion_result.nc"
 gridded_posterior="./gridded_posterior.nc"
 
 echo "Calling make_gridded_posterior.py"

@@ -148,15 +148,15 @@ if __name__ == '__main__':
     import sys
 
     n_clust = int(sys.argv[1])
-    prior_err = float(sys.argv[2])
-    obs_err = float(sys.argv[3])
+    jacobian_dir = sys.argv[2]
+    output_path = sys.argv[3]
     lon_min = float(sys.argv[4])
     lon_max = float(sys.argv[5])
     lat_min = float(sys.argv[6])
     lat_max = float(sys.argv[7])
-    gamma = float(sys.argv[8])
-    jacobian_dir = sys.argv[9]
-    output_path = sys.argv[10]
+    prior_err = float(sys.argv[8])
+    obs_err = float(sys.argv[9])
+    gamma = float(sys.argv[10])
 
     # Run the inversion code
     out = do_inversion(n_clust, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err, obs_err, gamma)

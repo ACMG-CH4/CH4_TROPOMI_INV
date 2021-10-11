@@ -1,5 +1,6 @@
 import xarray as xr
 import datetime
+from joblib import Parallel, delayed
 
 def zero_pad_num_hour(n):
     nstr = str(n)
@@ -35,8 +36,7 @@ def setup_GCdatadir(startday, endday, GC_source_pth, GC_destination_pth):
     hours = range(24)
 
     # For each day:
-    for d in days:
-        
+    def process(d):        
         # Load the SpeciesConc and LevelEdgeDiags data
         SpeciesConc_data = xr.load_dataset(f'{GC_source_pth}/GEOSChem.SpeciesConc.{d}_0000z.nc4')
         LevelEdgeDiags_data = xr.load_dataset(f'{GC_source_pth}/GEOSChem.LevelEdgeDiags.{d}_0000z.nc4')
@@ -54,6 +54,7 @@ def setup_GCdatadir(startday, endday, GC_source_pth, GC_destination_pth):
             SpeciesConc_for_hour.to_netcdf(SpeciesConc_save_pth)
             LevelEdgeDiags_for_hour.to_netcdf(LevelEdgeDiags_save_pth)
 
+    results = Parallel(n_jobs=-1) (delayed(process)(day) for day in days)    
     print(f'Set up hourly data files in {GC_destination_pth}')
 
 
