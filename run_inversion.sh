@@ -2,6 +2,7 @@
 
 #SBATCH -n 1
 #SBATCH -N 1
+#SBATCH -p huce_intel
 #SBATCH -t 0-03:00
 #SBATCH --mem 4000
 #SBATCH -o run_inversion_%j.out
@@ -10,39 +11,51 @@
 #=======================================================================
 # Configuration
 #=======================================================================
-NCLUST={CLUSTERS}
-STARTDAY={START}
-ENDDAY={END}
-MYPATH={MY_PATH}
-RUNNAME={RUN_NAME}
-SPINUPDIR="${MYPATH}/${RUNNAME}/spinup_run"
-JACRUNSDIR="${MYPATH}/${RUNNAME}/jacobian_runs"
-POSTRUNDIR="${MYPATH}/${RUNNAME}/posterior_run"
-CLUSTERSPTH="${MYPATH}/input_data/Clusters_permian_kmeans.nc"
-SENSIDIR="./Sensi"
-GCDATADIR="./data_GC"
-JACOBIANDIR="./data_converted"
-TROPOMIDIR="./data_TROPOMI"
+nClusters={CLUSTERS}
+StartDate={START}
+EndDate={END}
+MyPath={MY_PATH}
+RunName={RUN_NAME}
+IsAWS={IS_AWS}
+SpinupDir="${MyPath}/${RunName}/spinup_run"
+JacobianRunsDir="${MyPath}/${RunName}/jacobian_runs"
+PosteriorRunDir="${MyPath}/${RunName}/posterior_run"
+ClusterFile={CLUSTER_PATH}
+SensiDir="./Sensi"
+GCDir="./data_GC"
+JacobianDir="./data_converted"
+TROPOMIDir="./data_TROPOMI"
 
 # Download TROPOMI data. Disable this setting if rerunning for a time period
 # to avoid redownloading existing data
-FETCHTROPOMI=true
-
+if "$IsAWS"; then
+    FetchTROPOMI=true
+else
+    FetchTROPOMI=false
+fi
+    
 # Only matters for Kalman filter multi-week inversions
-firstsimswitch=true
+FirstSimSwitch=true
 
 # Load the Python environment
 # Comment this out for now and instruct users to activate their own Python envs
 # module load Anaconda3/5.0.1-fasrc01
 # source activate tropomi_oilgas_jupyter_3.6
 
+
+printf "\n=== EXECUTING RUN_INVERSION.SH ===\n"
+    
+#=======================================================================
+# Error checks
+#=======================================================================
+
 # Make sure specified paths exist
-if [[ ! -d ${JACRUNSDIR} ]]; then
-    echo "${JACRUNSDIR} does not exist. Please fix JACRUNDIR."
+if [[ ! -d ${JacobianRunsDir} ]]; then
+    printf "${JacobianRunsDir} does not exist. Please fix JacobianRunsDir in run_inversion.sh.\n"
     exit 1
 fi
-if [[ ! -f ${CLUSTERSPTH} ]]; then
-    echo "${CLUSTERSPTH} does not exist. Please fix CLUSTERSPTH."
+if [[ ! -f ${ClusterFile} ]]; then
+    printf "${ClusterFile} does not exist. Please fix ClusterFile in run_inversion.sh.\n"
     exit 1
 fi
 
@@ -50,84 +63,78 @@ fi
 # Postprocess the SpeciesConc and LevelEdgeDiags files from GEOS-Chem
 #=======================================================================
 
-echo "Calling postproc_diags.py, FSS=$firstsimswitch"
-if "$firstsimswitch"; then
-    if [[ ! -d ${SPINUPDIR} ]]; then
-	echo "${SPINUPDIR} does not exist. Please fix SPINUPDIR or set firstsimswitch to False."
+printf "Calling postproc_diags.py, FSS=$FirstSimSwitch\n"
+if "$FirstSimSwitch"; then
+    if [[ ! -d ${SpinupDir} ]]; then
+	printf "${SpinupDir} does not exist. Please fix SpinupDir or set FirstSimSwitch to False in run_inversion.sh.\n"
 	exit 1
     fi
-    PREVDIR=$SPINUPDIR
+    PrevDir=$SpinupDir
 else
-    PREVDIR=%$POSTRUNDIR
-    if [[ ! -d ${POSTRUNDIR} ]]; then
-	echo "${POSTRUNDIR} does not exist. Please fix POSTRUNDIR."
+    PrevDir=%$PosteriorRunDir
+    if [[ ! -d ${PosteriorRunDir} ]]; then
+	printf "${PosteriorRunDir} does not exist. Please fix PosteriorRunDir in run_inversion.sh.\n"
 	exit 1
     fi
 fi
-echo "  - Hour 0 for ${STARTDAY} will be obtained from ${PREVDIR}"
-    
-python postproc_diags.py $RUNNAME $JACRUNSDIR $PREVDIR $STARTDAY; wait
-echo "DONE -- postproc_diags.py"
-echo ""
+printf "  - Hour 0 for ${StartDate} will be obtained from ${PrevDir}\n"
+
+python postproc_diags.py $RunName $JacobianRunsDir $PrevDir $StartDate; wait
+printf "DONE -- postproc_diags.py\n\n"
 
 #=======================================================================
 # Calculate GEOS-Chem sensitivities and save to Sensi directory
 #=======================================================================
 
 # Temporary input definition
-PERTURBATION=0.5
+Perturbation=0.5
 
-echo "Calling calc_sensi.py"
-python calc_sensi.py $NCLUST $PERTURBATION $STARTDAY $ENDDAY $JACRUNSDIR $RUNNAME $SENSIDIR; wait
-echo "DONE -- calc_sensi.py"
-echo ""
+printf "Calling calc_sensi.py\n"
+python calc_sensi.py $nClusters $Perturbation $StartDate $EndDate $JacobianRunsDir $RunName $SensiDir; wait
+printf "DONE -- calc_sensi.py\n\n"
 
 #=======================================================================
 # Setup GC data directory in workdir
 #=======================================================================
-GCsourcepth="${JACRUNSDIR}/${RUNNAME}_0000/OutputDir"
+GCsourcepth="${JacobianRunsDir}/${RunName}_0000/OutputDir"
 
-echo "Calling setup_GCdatadir.py"
-python setup_GCdatadir.py $STARTDAY $ENDDAY $GCsourcepth $GCDATADIR; wait
-echo "DONE -- setup_GCdatadir.py"
-echo ""
+printf "Calling setup_GCdatadir.py\n"
+python setup_GCdatadir.py $StartDate $EndDate $GCsourcepth $GCDir; wait
+printf "DONE -- setup_GCdatadir.py\n\n"
 
 #=======================================================================
 # Generate Jacobian matrix files 
 #=======================================================================
 
-echo "Calling jacobian.py"
-python jacobian.py $STARTDAY $ENDDAY $TROPOMIDIR $FETCHTROPOMI; wait
-echo " DONE -- jacobian.py"
-echo ""
+printf "Calling jacobian.py\n"
+python jacobian.py $StartDate $EndDate $TROPOMIDir $FetchTROPOMI; wait
+printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
 # Do inversion
 #=======================================================================
 
-# New inputs (for Permian)
-LON_MIN=-111
-LON_MAX=-95
-LAT_MIN=25
-LAT_MAX=39
-PRIOR_ERR=0.5
-OBS_ERR=15
-GAMMA=0.25
+# Set input values
+LonMin={LON_MIN}
+LonMax={LON_MAX}
+LatMin={LAT_MIN}
+LatMax={LAT_MAX}
+PriorError={PRIOR_ERR}
+ObsError={OBS_ERR}
+Gamma={GAMMA}
 posteriorSF="./inversion_result.nc"
 
-echo "Calling invert.py"
-python invert.py $NCLUST $JACOBIANDIR $posteriorSF $LON_MIN $LON_MAX $LAT_MIN $LAT_MAX $PRIOR_ERR $OBS_ERR $GAMMA; wait
-echo "DONE -- invert.py"
-echo ""
+printf "Calling invert.py\n"
+python invert.py $nClusters $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma; wait
+printf "DONE -- invert.py\n\n"
 
 #=======================================================================
 # Create gridded posterior scaling factor netcdf file
 #=======================================================================
-gridded_posterior="./gridded_posterior.nc"
+GriddedPosterior="./gridded_posterior.nc"
 
-echo "Calling make_gridded_posterior.py"
-python make_gridded_posterior.py $posteriorSF $CLUSTERSPTH $gridded_posterior; wait
-echo "DONE -- make_gridded_posterior.py"
-echo ""
+printf "Calling make_gridded_posterior.py\n"
+python make_gridded_posterior.py $posteriorSF $ClusterFile $GriddedPosterior; wait
+printf "DONE -- make_gridded_posterior.py\n\n"
 
 exit 0
