@@ -468,7 +468,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
                        (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)  &
                        (TROPOMI['qa_value']  >= 0.5)          &
-                       (TROPOMI['swir_albedo'] >= 0.05)       & (TROPOMI['blended_albedo'] <= 0.85))
+                       (TROPOMI['swir_albedo'] > 0.05)       & (TROPOMI['blended_albedo'] < 0.85))
     # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
