@@ -73,6 +73,9 @@ def read_tropomi(filename):
  			                - UTC time
  			                - Local time
 			                - Averaging kernel
+                            - SWIR albedo
+                            - NIR albedo
+                            - Blended albedo
 			                - CH4 prior profile
 			                - Dry air subcolumns
 			                - Latitude bounds
@@ -111,9 +114,12 @@ def read_tropomi(filename):
     met['localtime'] = localtimes
     data.close()
  
-    # Store averaging kernel 
+    # Store column averaging kernel and SWIR, NIR surface albedo
     data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/DETAILED_RESULTS')
     met['column_AK'] = data['column_averaging_kernel'].values[0,:,:,::-1]
+    met['swir_albedo'] = data['surface_albedo_SWIR'].values[0,:,:]
+    met['nir_albedo'] = data['surface_albedo_NIR'].values[0,:,:]
+    met['blended_albedo'] = 2.4*met['nir_albedo'] − 1.13*met['swir_albedo']
     data.close()
     
     # Store methane prior profile, dry air subcolumns
@@ -457,11 +463,12 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
     # Read TROPOMI data
     TROPOMI = read_tropomi(filename)
     
-    # We're only going to consider data within lat/lon/time bounds, and with QA > 0.5
+    # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
     sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
                        (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)  &
-                       (TROPOMI['qa_value']  >= 0.5))
+                       (TROPOMI['qa_value']  >= 0.5)          &
+                       (TROPOMI['swir_albedo'] >= 0.05)       & (TROPOMI['blended_albedo'] <= 0.85))
     # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
