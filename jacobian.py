@@ -141,7 +141,7 @@ def read_tropomi(filename):
     # Store vertical pressure profile
     N1 = met['methane'].shape[0]
     N2 = met['methane'].shape[1]
-    pressures = np.zeros([N1,N2,13], dtype=np.float)
+    pressures = np.zeros([N1,N2,13], dtype=np.float32)
     pressures.fill(np.nan)
     for i in range(12+1):
         pressures[:,:,i] = surface_pressure - i*pressure_interval
