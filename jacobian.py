@@ -12,25 +12,21 @@ from shapely.geometry import Polygon
 
 # Notes:
 # ======
-# - FIXED HARD-CODED PERTURBATION THING
 # - The lat_ratio.csv file used for stratospheric correction is manually defined.
 #   We may want to remove this feature entirely.
 # - Not sure why we need both local times and UTC times. There are several
 #   question-comments about this below.
-# - Lu optimizes scaling factors, so he increases the sensitivities by a factor
-#   of two, due to the 1.5 scaling perturbation. This is hard-coded and doesn't 
-#   work if we are optimizing absolute emissions.
 # - Not sure about some variables in the cal_weights() and remap()/remap2()
 #   functions:
 # 	    - data_type
 # 	    - location
 #	    - first_2
-# - When Lu computes virtual TROPOMI column from GC data using the TROPOMI prior
-#   and averaging kernel, he does it as the weighted mean mixing ratio [ppb] of
-#   the relevant GC ground cells. Zhen does it as the weighted mean of number
-#   of molecules instead. This requires saving out an additional GC diagnostic
-#   variable -- something like the mass column in addition to PEDGE.
-# - Need to double-check units of Jacobian [mixing ratio, unitless] vs units of
+# - We compute virtual TROPOMI column from GEOS-Chem data using the TROPOMI prior
+#   and averaging kernel, as the weighted mean mixing ratio [ppb] over the column
+#   in relevant GEOS-Chem ground cell(s). Zhen Qu does it as the weighted mean of
+#   the number of molecules instead. This requires saving out an additional GC 
+#   diagnostic variable -- something like the mass column in addition to PEDGE.
+# - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
 #   virtual TROPOMI column [ppb] in use_AK_to_GC().
 
 # =============================================================================
@@ -66,10 +62,10 @@ def read_tropomi(filename):
 
     Returns
         met      [dict] : Dictionary of important variables from TROPOMI:
-	    	                - CH4
+                            - CH4
  			                - Latitude
-			                - Longitude
-       		                - QA value
+                            - Longitude
+                            - QA value
  			                - UTC time
  			                - Local time
 			                - Averaging kernel
@@ -589,6 +585,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
             Sat_CH4_2 = Sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
+            # Using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
             tropomi_sees_ipixel = sum(priori + AK * (Sat_CH4_2-priori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             
             # Weight by overlapping area (to be divided out later) and add to sum
