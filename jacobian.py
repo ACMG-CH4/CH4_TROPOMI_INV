@@ -16,7 +16,7 @@ from shapely.geometry import Polygon
 #   We may want to remove this feature entirely.
 # - Not sure why we need both local times and UTC times. There are several
 #   question-comments about this below.
-# - Not sure about some variables in the cal_weights() and remap()/remap2()
+# - Missing descriptions for variables in the cal_weights() and remap()/remap2()
 #   functions:
 # 	    - data_type
 # 	    - location
