@@ -266,17 +266,17 @@ def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato
 
 def cal_weights(Sat_p, GC_p):
     """
-    Calculate pressure weights for TROPOMI & GEOS-Chem on a joint, uneven grid
+    Calculate pressure weights for TROPOMI & GEOS-Chem on a merged vertical (pressure) grid
 
     Arguments
-        Sat_p   [float]    : Pressure edge from TROPOMI (13)          <--- 13-1 = 12 pressure levels
-        GC_p    [float]    : Pressure edge from GEOS-Chem (48)        <--- 48-1 = 47 pressure levels
+        Sat_p   [float]    : Pressure edges from TROPOMI (13)          <--- 13-1 = 12 pressure levels
+        GC_p    [float]    : Pressure edges from GEOS-Chem (48)        <--- 48-1 = 47 pressure levels
 
     Returns
         weights [dict]     : Pressure weights
     """
 
-    # Combine Sat_p and GC_p into joint, uneven vertical grid
+    # Combine Sat_p and GC_p into merged vertical grid
     Com_p = np.zeros(len(Sat_p)+len(GC_p))                     # <--- 61-1 = 60 pressure levels
     Com_p.fill(np.nan)
     data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int) 
@@ -326,14 +326,14 @@ def cal_weights(Sat_p, GC_p):
 
 def remap(GC_CH4, data_type, Com_p, location, first_2):
     """
-    Remap GEOS-Chem methane to TROPOMI vertical grid.
+    Remap GEOS-Chem methane to the TROPOMI vertical grid.
 
     Arguments
         GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
-        data_type [int]     : ****
-        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : ****
-        first_2   [int]     : ****
+        data_type [int]     : From cal_weights()
+        Com_p     [float]   : From cal_weights(), Combined TROPOMI + GEOS-Chem pressure levels
+        location  [int]     : From cal_weights()
+        first_2   [int]     : From cal_weights()
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
@@ -366,14 +366,14 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
 
 def remap2(Sensi, data_type, Com_p, location, first_2):
     """
-    Remap GEOS-Chem sensitivity data (from perturbation simulations) to TROPOMI vertical grid.
+    Remap GEOS-Chem sensitivity data (from perturbation simulations) to the TROPOMI vertical grid.
 
     Arguments
-        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster)****double-check dim order
-        data_type [int]     : ****
-        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : ****
-        first_2   [int]     : ****
+        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster) ****double-check dim order
+        data_type [int]     : From cal_weights()
+        Com_p     [float]   : From cal_weights(), Combined TROPOMI + GEOS-Chem pressure levels
+        location  [int]     : From cal_weights()
+        first_2   [int]     : From cal_weights()
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
