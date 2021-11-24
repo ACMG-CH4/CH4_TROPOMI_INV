@@ -368,7 +368,7 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
     Remap GEOS-Chem sensitivity data (from perturbation simulations) to TROPOMI vertical grid.
 
     Arguments
-        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster)****double-check dim order
+        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, element)****double-check dim order
         data_type [int]     : ****
         Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels
         location  [int]     : ****
@@ -419,13 +419,13 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 
 # -----------------------------------------------------------------------------
 
-def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
+def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Map GEOS-Chem data to TROPOMI observation space.
 
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
-        n_clust        [int]        : Number of clusters / state vector elements
+        n_elements     [int]        : Number of state vector elements
         GC_startdate   [datetime64] : First day of inversion period, for GC and
                                       TROPOMI
         GC_enddate     [datetime64] : Last day of inversion period, for GC and
@@ -472,7 +472,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
     # If need to build Jacobian from GC perturbation simulation sensitivity data:
     if use_Sensi:
         # Initialize Jacobian K
-        temp_KK = np.zeros([NN,n_clust], dtype=np.float32)
+        temp_KK = np.zeros([NN,n_elements], dtype=np.float32)
         temp_KK.fill(np.nan)
     
     # Initialize array with NN rows, 6 columns: TROPOMI-CH4, GC-CH4, longitude, latitude, II, JJ
@@ -592,17 +592,17 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
             # sensitivity data:
             if use_Sensi:
                 
-                # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and clusters
+                # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and state vector elements
                 Sensi = GC['Sensi'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
                 Sat_CH4 = remap2(Sensi, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2'])      # mixing ratio, unitless
                 
                 # Tile the TROPOMI averaging kernel
-                AKs = np.transpose(np.tile(AK, (n_clust,1)))
+                AKs = np.transpose(np.tile(AK, (n_elements,1)))
                 
                 # Tile the TROPOMI dry air subcolumns
-                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_clust,1)))   # mol m-2
+                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_elements,1)))   # mol m-2
                 
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
                 ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
@@ -645,7 +645,7 @@ def download_TROPOMI(startdate, enddate):
 
     Arguments
         startdate   [np.datetime64]  : Start date of download range
-        n_clust     [np.datetime64]  : End date of download range
+        enddate     [np.datetime64]  : End date of download range
 
     """
     # offline: 11/28/18 to end of 2020? + parts of 01/21
@@ -760,6 +760,12 @@ if __name__ == '__main__':
 
     startday = sys.argv[1]
     endday = sys.argv[2]
+    lonmin = float(sys.argv[3])
+    lonmax = float(sys.argv[4])
+    latmin = float(sys.argv[5])
+    latmax = float(sys.argv[6])
+    nelements = int(sys.argv[7])
+    nbufferclusters = int(sys.argv[8])
  
     # Reformat start and end days for datetime in configuration
     start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
@@ -773,16 +779,16 @@ if __name__ == '__main__':
     Sat_datadir = f'{workdir}/data_TROPOMI'
     GC_datadir = f'{workdir}/data_GC'
     outputdir = f'{workdir}/data_converted'
-    n_clust = 235+8
-    xlim = [-111,-95]
-    ylim = [24,39]
+    n_elements = nelements+nbufferclusters
+    xlim = [lonmin,lonmax]
+    ylim = [latmin,latmax]
     GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
     GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
     print('Start:', start)
     print('End:', end)
 
     # Download TROPOMI data from AWS if requested
-    if bool(sys.argv[3]):
+    if bool(sys.argv[9]):
         download_TROPOMI(GC_startdate, GC_enddate)
     
     # Get TROPOMI data filenames for the desired date range
@@ -815,10 +821,10 @@ if __name__ == '__main__':
                 df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
                 lat_ratio = df.values
-                result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
             else:
                 print('Running use_AK_to_GC().')
-                result = use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir)
+                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir)
         save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
 
     print(f'Wrote files to {outputdir}')

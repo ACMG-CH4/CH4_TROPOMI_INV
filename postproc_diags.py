@@ -13,8 +13,8 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
     for hour 0 of the last day, with the first output file of the more recent 
     simulation (a production simulation). This needs to be done for both 
     SpeciesConc and LevelEdgeDiags, and it needs to be done for every run 
-    directory: i.e., for every perturbed cluster simulation, and also for the 
-    base/reference simulation. 
+    directory: i.e., for every perturbed state vector element simulation, and
+    also for the base/reference simulation. 
     
     Example:
     A GEOS-Chem perturbation simulation for one month, from 20180501 to 20180601. 

@@ -20,13 +20,13 @@ def zero_pad_num_hour(n):
         nstr = '0'+nstr
     return nstr
 
-def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
+def calc_sensi(nelements, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     '''
     Loops over output data from GEOS-Chem perturbation simulations to compute sensitivities 
     for the Jacobian matrix.
 
     Arguments
-        nclust         [int]   : Number of clusters / state vector elements
+        nelements      [int]   : Number of state vector elements
         perturbation   [float] : Size of perturbation (e.g., 0.5)
         startday       [str]   : First day of inversion period; formatted YYYYMMDD
         endday         [str]   : Last day of inversion period; formatted YYYYMMDD
@@ -55,13 +55,13 @@ def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, s
             nlev = count the number of vertical levels
             for each hour:
                 base = extract the base run data for the hour
-                Sensi = np.empty((nlon, nlat, nlev, nclust))
+                Sensi = np.empty((nlon, nlat, nlev, nelements))
                 Sensi.fill(np.nan)
-                for each cluster:
-                    load the SpeciesConc .nc file for the cluster and day
+                for each state vector element:
+                    load the SpeciesConc .nc file for the element and day
                     pert = extract the data for the hour
                     sens = pert - base
-                    Sensi[:,:,:,cluster] = sens
+                    Sensi[:,:,:,element] = sens
                 save Sensi as netcdf with appropriate coordinate variables
     '''
 
@@ -77,7 +77,7 @@ def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, s
 
     # Loop over model data to get sensitivities
     hours = range(24)
-    clust = range(nclust)
+    elements = range(nelements)
 
     # For each day
     for d in days:
@@ -92,23 +92,23 @@ def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, s
             # Get the base run data for the hour
             base = base_data['SpeciesConc_CH4'][h,:,:,:]
             # Initialize sensitivities array
-            Sensi = np.empty((nclust, nlev, nlat, nlon))
+            Sensi = np.empty((nelements, nlev, nlat, nlon))
             Sensi.fill(np.nan)
-            # For each cluster
-            for c in clust:
-                # Clusters are numbered 1..nclust
-                cstr = zero_pad_num(c+1)
-                # Load the SpeciesConc file for the current cluster and day
-                pert_data = xr.load_dataset(f'{run_dirs_pth}/{run_name}_{cstr}/OutputDir/GEOSChem.SpeciesConc.{d}_0000z.nc4')
+            # For each state vector element
+            for e in elements:
+                # State vector elements are numbered 1..nelements
+                elem = zero_pad_num(e+1)
+                # Load the SpeciesConc file for the current element and day
+                pert_data = xr.load_dataset(f'{run_dirs_pth}/{run_name}_{elem}/OutputDir/GEOSChem.SpeciesConc.{d}_0000z.nc4')
                 # Get the data for the current hour
                 pert = pert_data['SpeciesConc_CH4'][h,:,:,:]
                 # Compute and store the sensitivities
                 sens = (pert.values - base.values)/perturbation
-                Sensi[c,:,:,:] = sens
+                Sensi[e,:,:,:] = sens
             # Save Sensi as netcdf with appropriate coordinate variables
             Sensi = xr.DataArray(Sensi, 
-                                 coords=(np.arange(1,nclust+1), np.arange(1,nlev+1), base.lat, base.lon), 
-                                 dims=['clust','lev','lat','lon'],
+                                 coords=(np.arange(1,nelements+1), np.arange(1,nlev+1), base.lat, base.lon), 
+                                 dims=['element','lev','lat','lon'],
                                  name='Sensitivities')
             Sensi = Sensi.to_dataset()
             Sensi.to_netcdf(f'{sensi_save_pth}/Sensi_{d}_{zero_pad_num_hour(h)}.nc')
@@ -123,7 +123,7 @@ def calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, s
 if __name__ == '__main__':
     import sys
 
-    nclust = int(sys.argv[1])
+    nelements = int(sys.argv[1])
     perturbation = float(sys.argv[2])
     startday = sys.argv[3]
     endday = sys.argv[4]
@@ -131,4 +131,4 @@ if __name__ == '__main__':
     run_name = sys.argv[6]
     sensi_save_pth = sys.argv[7]
 
-    calc_sensi(nclust, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth)
+    calc_sensi(nelements, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth)

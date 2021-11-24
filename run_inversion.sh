@@ -11,16 +11,21 @@
 #=======================================================================
 # Configuration
 #=======================================================================
-nClusters={CLUSTERS}
 StartDate={START}
 EndDate={END}
+LonMin={LON_MIN}
+LonMax={LON_MAX}
+LatMin={LAT_MIN}
+LatMax={LAT_MAX}
+nElements={STATE_VECTOR_ELEMENTS}
+nBufferClusters={BUFFER_CLUSTERS}
 MyPath={MY_PATH}
 RunName={RUN_NAME}
 IsAWS={IS_AWS}
 SpinupDir="${MyPath}/${RunName}/spinup_run"
 JacobianRunsDir="${MyPath}/${RunName}/jacobian_runs"
 PosteriorRunDir="${MyPath}/${RunName}/posterior_run"
-ClusterFile={CLUSTER_PATH}
+StateVectorFile={STATE_VECTOR_PATH}
 SensiDir="./Sensi"
 GCDir="./data_GC"
 JacobianDir="./data_converted"
@@ -54,8 +59,8 @@ if [[ ! -d ${JacobianRunsDir} ]]; then
     printf "${JacobianRunsDir} does not exist. Please fix JacobianRunsDir in run_inversion.sh.\n"
     exit 1
 fi
-if [[ ! -f ${ClusterFile} ]]; then
-    printf "${ClusterFile} does not exist. Please fix ClusterFile in run_inversion.sh.\n"
+if [[ ! -f ${StateVectorFile} ]]; then
+    printf "${StateVectorFile} does not exist. Please fix StateVectorFile in run_inversion.sh.\n"
     exit 1
 fi
 
@@ -90,7 +95,7 @@ printf "DONE -- postproc_diags.py\n\n"
 Perturbation=0.5
 
 printf "Calling calc_sensi.py\n"
-python calc_sensi.py $nClusters $Perturbation $StartDate $EndDate $JacobianRunsDir $RunName $SensiDir; wait
+python calc_sensi.py $nElements $Perturbation $StartDate $EndDate $JacobianRunsDir $RunName $SensiDir; wait
 printf "DONE -- calc_sensi.py\n\n"
 
 #=======================================================================
@@ -107,7 +112,7 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 #=======================================================================
 
 printf "Calling jacobian.py\n"
-python jacobian.py $StartDate $EndDate $TROPOMIDir $FetchTROPOMI; wait
+python jacobian.py $StartDate $EndDate $LonMin $LonMax $LatMin $LatMax $nElements $nBufferClusters $FetchTROPOMI; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
@@ -125,7 +130,7 @@ Gamma={GAMMA}
 posteriorSF="./inversion_result.nc"
 
 printf "Calling invert.py\n"
-python invert.py $nClusters $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma; wait
+python invert.py $nElements $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma; wait
 printf "DONE -- invert.py\n\n"
 
 #=======================================================================
@@ -134,7 +139,7 @@ printf "DONE -- invert.py\n\n"
 GriddedPosterior="./gridded_posterior.nc"
 
 printf "Calling make_gridded_posterior.py\n"
-python make_gridded_posterior.py $posteriorSF $ClusterFile $GriddedPosterior; wait
+python make_gridded_posterior.py $posteriorSF $StateVectorFile $GriddedPosterior; wait
 printf "DONE -- make_gridded_posterior.py\n\n"
 
 exit 0
