@@ -16,11 +16,6 @@ from shapely.geometry import Polygon
 #   We may want to remove this feature entirely.
 # - Not sure why we need both local times and UTC times. There are several
 #   question-comments about this below.
-# - Missing descriptions for variables in the cal_weights() and remap()/remap2()
-#   functions:
-# 	    - data_type
-# 	    - location
-#	    - first_2
 # - We compute virtual TROPOMI column from GEOS-Chem data using the TROPOMI prior
 #   and averaging kernel, as the weighted mean mixing ratio [ppb] over the column
 #   in relevant GEOS-Chem ground cell(s). Zhen Qu does it as the weighted mean of
@@ -273,11 +268,17 @@ def cal_weights(Sat_p, GC_p):
         GC_p    [float]    : Pressure edges from GEOS-Chem (48)        <--- 48-1 = 47 pressure levels
 
     Returns
-        weights [dict]     : Pressure weights
+        weights [dict]     : Pressure weights dictionary
+                                - Com_p     : merged pressure-edge grid 
+                                - data_type : for each pressure edge in the merged grid, 
+                                              is it from GC or TROPOMI?
+                                - location  : index of pressure edge
+                                - first_2   : index of first GEOS-Chem pressure edge in
+                                              the merged grid
     """
 
     # Combine Sat_p and GC_p into merged vertical grid
-    Com_p = np.zeros(len(Sat_p)+len(GC_p))                     # <--- 61-1 = 60 pressure levels
+    Com_p = np.zeros(len(Sat_p)+len(GC_p))
     Com_p.fill(np.nan)
     data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int) 
     data_type.fill(-99)
@@ -330,16 +331,16 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
 
     Arguments
         GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
-        data_type [int]     : From cal_weights()
-        Com_p     [float]   : From cal_weights(), Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : From cal_weights()
-        first_2   [int]     : From cal_weights()
+        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from cal_weights()
+        data_type [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from cal_weights()
+        location  [int]     : Indexes of pressure edges, from cal_weights()
+        first_2   [int]     : Index of first GEOS-Chem pressure edge in merged grid, from cal_weights()
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
     """
     
-    # ****
+    # Define XCH4 in the layers of the merged pressure grid
     conc = np.zeros(len(Com_p)-1,); conc.fill(np.nan)
     k=0
     for i in range(first_2, len(Com_p)-1):
@@ -349,7 +350,7 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
     if first_2 > 0:
         conc[:first_2] = conc[first_2]
     
-    # Calculate the weighted mean methane for each layer
+    # Calculate the weighted mean methane for each TROPOMI layer
     delta_p = Com_p[:-1] - Com_p[1:]
     Sat_CH4 = np.zeros(12); Sat_CH4.fill(np.nan)
     for i in range(len(location)-1):
@@ -370,16 +371,16 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
 
     Arguments
         Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster) ****double-check dim order
-        data_type [int]     : From cal_weights()
-        Com_p     [float]   : From cal_weights(), Combined TROPOMI + GEOS-Chem pressure levels
-        location  [int]     : From cal_weights()
-        first_2   [int]     : From cal_weights()
+        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from cal_weights()
+        data_type [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from cal_weights()
+        location  [int]     : Indexes of pressure edges, from cal_weights()
+        first_2   [int]     : Index of first GEOS-Chem pressure edge in merged grid, from cal_weights()
 
     Returns
         Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
     """
     
-    # ****
+    # Define XCH4 in the layers of the merged pressure grid
     MM = Sensi.shape[1]
     conc = np.zeros((len(Com_p)-1, MM))
     conc.fill(np.nan)
@@ -464,7 +465,7 @@ def use_AK_to_GC(filename, n_clust, GC_startdate, GC_enddate, xlim, ylim, use_Se
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
                        (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)  &
                        (TROPOMI['qa_value']  >= 0.5)          &
-                       (TROPOMI['swir_albedo'] > 0.05)       & (TROPOMI['blended_albedo'] < 0.85))
+                       (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
     # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
