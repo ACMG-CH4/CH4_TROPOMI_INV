@@ -144,12 +144,13 @@ def read_tropomi(filename):
 
 # -----------------------------------------------------------------------------
 
-def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
 
     Arguments
         date           [str]   : date of interest
+        GC_datadir     [str]   : Path to GC output data
         use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities
                                  to TROPOMI observation space?
         Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC
@@ -238,7 +239,7 @@ def read_GC(date, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat
 
 # -----------------------------------------------------------------------------
 
-def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """ 
     Call read_GC() for multiple dates in a loop. 
 
@@ -253,7 +254,7 @@ def read_all_GC(all_strdate, use_Sensi=False, Sensi_datadir=None, correct_strato
 
     met={}
     for strdate in all_strdate:
-        met[strdate] = read_GC(strdate, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
+        met[strdate] = read_GC(strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
     
     return met
 
@@ -422,7 +423,7 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
 
 # -----------------------------------------------------------------------------
 
-def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
+def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Map GEOS-Chem data to TROPOMI observation space.
 
@@ -435,6 +436,7 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use
                                       TROPOMI
         xlim           [float]      : Longitude bounds for simulation domain
         ylim           [float]      : Latitude bounds for simulation domain
+        GC_datadir     [str]        : Path to GC output data
         use_Sensi      [log]        : Are we trying to map GEOS-Chem
                                       sensitivities to TROPOMI observation space?
         Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the
@@ -501,7 +503,7 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use
     all_strdate = list(set(all_strdate))
 
     # Read GEOS_Chem data for the dates of interest
-    all_date_GC = read_all_GC(all_strdate, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+    all_date_GC = read_all_GC(all_strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
    
     # For each TROPOMI observation: 
     for iNN in range(NN):
@@ -824,10 +826,10 @@ if __name__ == '__main__':
                 df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
                 lat_ratio = df.values
-                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
             else:
                 print('Running use_AK_to_GC().')
-                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, use_Sensi, Sensi_datadir)
+                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir)
         save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
 
     print(f'Wrote files to {outputdir}')
