@@ -770,7 +770,6 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
-    nbufferclusters = int(sys.argv[8])  # keep for now because fetchTROPOMI is arg9
  
     # Reformat start and end days for datetime in configuration
     start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
@@ -784,7 +783,6 @@ if __name__ == '__main__':
     Sat_datadir = f'{workdir}/data_TROPOMI'
     GC_datadir = f'{workdir}/data_GC'
     outputdir = f'{workdir}/data_converted'
-    #n_elements = nelements+nbufferclusters
     xlim = [lonmin,lonmax]
     ylim = [latmin,latmax]
     GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
@@ -793,7 +791,7 @@ if __name__ == '__main__':
     print('End:', end)
 
     # Download TROPOMI data from AWS if requested
-    if bool(sys.argv[9]):
+    if bool(sys.argv[8]):
         download_TROPOMI(GC_startdate, GC_enddate)
     
     # Get TROPOMI data filenames for the desired date range

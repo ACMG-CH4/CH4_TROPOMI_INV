@@ -112,7 +112,7 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 #=======================================================================
 
 printf "Calling jacobian.py\n"
-python jacobian.py $StartDate $EndDate $LonMin $LonMax $LatMin $LatMax $nElements $nBufferClusters $FetchTROPOMI; wait # can remove $nBufferClusters
+python jacobian.py $StartDate $EndDate $LonMin $LonMax $LatMin $LatMax $nElements $FetchTROPOMI; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
