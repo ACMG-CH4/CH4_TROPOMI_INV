@@ -91,7 +91,7 @@ printf "DONE -- postproc_diags.py\n\n"
 # Calculate GEOS-Chem sensitivities and save to Sensi directory
 #=======================================================================
 
-# Temporary input definition
+# 50% perturbation implied by PerturbValue (config.yml): 1.5 - 1 = 0.5
 Perturbation=0.5
 
 printf "Calling calc_sensi.py\n"
