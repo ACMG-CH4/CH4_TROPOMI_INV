@@ -141,7 +141,14 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     ratio = np.linalg.inv(gamma*all_part1 + inv_Sa)@(gamma*all_part2)
     xhat = 1 + ratio
 
-    return xhat, ratio, all_part1, all_part2
+    # Posterior error covariance matrix
+    S_post = np.linalg.inv(gamma*all_part1 + inv_Sa)
+
+    # Averaging kernel matrix
+    A = np.identity(n_clust) - S_post@inv_Sa
+
+
+    return xhat, ratio, all_part1, all_part2, S_post, A
 
 
 if __name__ == '__main__':
@@ -164,6 +171,8 @@ if __name__ == '__main__':
     ratio = out[1]
     all_part1 = out[2]
     all_part2 = out[3]
+    S_post = out[4]
+    A = out[5]
 
     # Print some statistics
     print('Min:', xhat.min(), 'Mean:', xhat.mean(), 'Max', xhat.max())
@@ -175,10 +184,14 @@ if __name__ == '__main__':
     nc_all_part2 = dataset.createVariable('all_part2', np.float32,('nvar'))
     nc_ratio = dataset.createVariable('ratio', np.float32,('nvar'))
     nc_xhat = dataset.createVariable('xhat', np.float32, ('nvar'))
+    nc_S_post = dataset.createVariable('S_post', np.float32,('nvar','nvar'))
+    nc_A = dataset.createVariable('A', np.float32,('nvar','nvar'))
     nc_all_part1[:,:] = all_part1
     nc_all_part2[:] = all_part2
     nc_ratio[:] = ratio
     nc_xhat[:] = xhat
+    nc_S_post[:,:] = S_post
+    nc_A[:,:] = A
     dataset.close()
 
     print(f'Saved results to {output_path}')
