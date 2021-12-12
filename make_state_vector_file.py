@@ -42,7 +42,7 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     statevector[(statevector.lat < lat_min+buffer_deg) | (statevector.lat > lat_max-buffer_deg), :] = 0
 
     # Fill in the NaNs with state vector element values
-    statevector.values[statevector.isnull()] = np.arange(1, statevector.isnull().sum()+1)[::-1]
+    statevector.values[tuple(statevector.isnull())] = np.arange(1, statevector.isnull().sum()+1)[::-1]
 
     # Assign buffer pixels to state vector
     # -------------------------------------------------------------------------
