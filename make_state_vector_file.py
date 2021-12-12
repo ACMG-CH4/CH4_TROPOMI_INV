@@ -31,18 +31,18 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     lc = (lc['FRLAKE'] + lc['FRLAND'] + lc['FRLANDIC']).drop('time').squeeze()
     
     # Subset the area of interest
-    lc = lc.isel(lon=lc.lon>=lon_min, lat=lc.lat>=lat_min)
-    lc = lc.isel(lon=lc.lon<=lon_max, lat=lc.lat<=lat_max)
+    lc = lc.isel(lon=lc.lon>=lon_min-buffer_deg, lat=lc.lat>=lat_min-buffer_deg)
+    lc = lc.isel(lon=lc.lon<=lon_max+buffer_deg, lat=lc.lat<=lat_max+buffer_deg)
 
     # Replace all values with NaN (to be filled later)
     statevector = lc.where(lc == -9999.)
 
     # Set pixels in buffer areas to 0
-    statevector[:, (statevector.lon < lon_min+buffer_deg) | (statevector.lon > lon_max-buffer_deg)] = 0
-    statevector[(statevector.lat < lat_min+buffer_deg) | (statevector.lat > lat_max-buffer_deg), :] = 0
+    statevector[:, (statevector.lon < lon_min) | (statevector.lon > lon_max)] = 0
+    statevector[(statevector.lat < lat_min) | (statevector.lat > lat_max), :] = 0
 
     # Fill in the NaNs with state vector element values
-    statevector.values[tuple(statevector.isnull())] = np.arange(1, statevector.isnull().sum()+1)[::-1]
+    statevector.values[statevector.isnull()] = np.arange(1, statevector.isnull().sum()+1)[::-1]
 
     # Assign buffer pixels to state vector
     # -------------------------------------------------------------------------
