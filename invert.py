@@ -145,7 +145,7 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     S_post = np.linalg.inv(gamma*all_part1 + inv_Sa)
 
     # Averaging kernel matrix
-    A = np.identity(n_clust) - S_post@inv_Sa
+    A = np.identity(n_elements) - S_post@inv_Sa
 
 
     return xhat, ratio, all_part1, all_part2, S_post, A
