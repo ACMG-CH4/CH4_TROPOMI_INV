@@ -17,9 +17,9 @@ def do_gridding(vector, statevector):
     target_array[:] = np.nan
     for ilat in range(nlat):
         for ilon in range(nlon):
-            element_id = int(statevector['StateVector'].values[ilat,ilon])
+            element_id = statevector['StateVector'].values[ilat,ilon]
             if ~np.isnan(element_id):
-                target_array[ilat,ilon] = vector[element_id-1]
+                target_array[ilat,ilon] = vector[int(element_id)-1]
 
     # Convert to data array
     lat = statevector['lat'].values
@@ -60,6 +60,8 @@ def make_gridded_posterior(posterior_SF_path, state_vector_path, save_path):
     gridded_A = do_gridding(A, statevector)
 
     # Create dataset
+    lat = gridded_SF['lat'].values
+    lon = gridded_SF['lon'].values
     ds = xr.Dataset({'ScaleFactor': (["lat", "lon"], gridded_SF),
                      'S_post': (["lat", "lon"], gridded_S_post),
                      'A': (["lat", "lon"], gridded_A)},
