@@ -111,7 +111,7 @@ def read_tropomi(filename):
     met['column_AK'] = data['column_averaging_kernel'].values[0,:,:,::-1]
     met['swir_albedo'] = data['surface_albedo_SWIR'].values[0,:,:]
     met['nir_albedo'] = data['surface_albedo_NIR'].values[0,:,:]
-    met['blended_albedo'] = 2.4*met['nir_albedo'] − 1.13*met['swir_albedo']
+    met['blended_albedo'] = 2.4*met['nir_albedo'] - 1.13*met['swir_albedo']
     data.close()
     
     # Store methane prior profile, dry air subcolumns
