@@ -49,18 +49,18 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
         # Load output SpeciesConc and LevelEdgeDiags file
         output_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0005z.nc4'
         output_data_SC = xr.load_dataset(output_file_SC)
-        output_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0005z.nc4'
-        output_data_LE = xr.load_dataset(output_file_LE)
+        if '0000' in r:
+            output_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0005z.nc4'
+            output_data_LE = xr.load_dataset(output_file_LE)
         
-        # Merge output and copied datasets
+        # Merge output and copied datasets and replace original files that were missing the first hour
         merged_data_SC = xr.merge([output_data_SC, prev_data_SC])
-        merged_data_LE = xr.merge([output_data_LE, prev_data_LE])
-        
-        # Replace original files that were missing the first hour
         final_file_SC = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
-        final_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
         merged_data_SC.to_netcdf(final_file_SC)
-        merged_data_LE.to_netcdf(final_file_LE)
+        if '0000' in r:
+            merged_data_LE = xr.merge([output_data_LE, prev_data_LE])
+            final_file_LE = f'{run_dirs_pth}/{r}/OutputDir/GEOSChem.LevelEdgeDiags.{start_day}_0000z.nc4'
+            merged_data_LE.to_netcdf(final_file_LE)
 
     results = Parallel(n_jobs=-1)(delayed(process)(run) for run in rundirs)
         
