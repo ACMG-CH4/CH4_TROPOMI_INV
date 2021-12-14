@@ -13,11 +13,13 @@ def do_gridding(vector, statevector):
     # Map the input vector (e.g., scale factors) to the state vector grid
     nlat = len(statevector['lat'])
     nlon = len(statevector['lon'])
-    target_array = np.zeros(statevector['StateVector'].shape)
+    target_array = np.empty(statevector['StateVector'].shape)
+    target_array[:] = np.nan
     for ilat in range(nlat):
         for ilon in range(nlon):
             element_id = int(statevector['StateVector'].values[ilat,ilon])
-            target_array[ilat,ilon] = vector[element_id-1]
+            if ~np.isnan(element_id):
+                target_array[ilat,ilon] = vector[element_id-1]
 
     # Convert to data array
     lat = statevector['lat'].values
