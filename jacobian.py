@@ -830,6 +830,8 @@ if __name__ == '__main__':
             else:
                 print('Running use_AK_to_GC().')
                 result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir)
-        save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
+        if result['obs_GC'].shape[0] > 0:
+            print('Saving .pkl file')
+            save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
 
     print(f'Wrote files to {outputdir}')
