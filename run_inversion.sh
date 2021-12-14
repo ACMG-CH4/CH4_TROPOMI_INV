@@ -33,7 +33,7 @@ TROPOMIDir="./data_TROPOMI"
 
 # Download TROPOMI data. Disable this setting if rerunning for a time period
 # to avoid redownloading existing data
-if "$IsAWS"; then
+if "$isAWS"; then
     FetchTROPOMI=true
 else
     FetchTROPOMI=false
