@@ -15,8 +15,6 @@ import subprocess
 # ======
 # - The lat_ratio.csv file used for stratospheric correction is manually defined.
 #   We may want to remove this feature entirely.
-# - Not sure why we need both local times and UTC times. There are several
-#   question-comments about this below.
 # - We compute virtual TROPOMI column from GEOS-Chem data using the TROPOMI prior
 #   and averaging kernel, as the weighted mean mixing ratio [ppb] over the column
 #   in relevant GEOS-Chem ground cell(s). Zhen Qu does it as the weighted mean of
@@ -63,7 +61,7 @@ def read_tropomi(filename):
                             - Longitude
                             - QA value
  			                - UTC time
- 			                - Local time
+ 			                - Time (utc time reshaped for orbit)
 			                - Averaging kernel
                             - SWIR albedo
                             - NIR albedo
@@ -85,7 +83,7 @@ def read_tropomi(filename):
     met['longitude'] = data['longitude'].values[0,:,:]
     met['latitude'] = data['latitude'].values[0,:,:]
     
-    # Store UTC time [****why is this necessary? time_utc is a standard tropomi variable]
+    # Store UTC time
     referencetime = data['time'].values
     delta_time = data['delta_time'][0].values
     strdate = []
@@ -98,12 +96,11 @@ def read_tropomi(filename):
         pass
     met['utctime'] = strdate
     
-    # Store local time
-    timeshift = np.array(met['longitude']/15*60, dtype=int)   # Convert to minutes
-    localtimes = np.zeros(shape=timeshift.shape, dtype='datetime64[ns]')
-    for kk in range(timeshift.shape[0]):
-        localtimes[kk,:] = strdate[kk]
-    met['localtime'] = localtimes
+    # Store time for whole orbit
+    times = np.zeros(shape=met['longitude'].shape, dtype='datetime64[ns]')
+    for kk in range(met['longitude'].shape[0]):
+        times[kk,:] = strdate[kk]
+    met['time'] = times
     data.close()
  
     # Store column averaging kernel and SWIR, NIR surface albedo
@@ -466,10 +463,9 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
     # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
     sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
-                       (TROPOMI['localtime'] >= GC_startdate) & (TROPOMI['localtime'] <= GC_enddate)  &
+                       (TROPOMI['time'] >= GC_startdate)      & (TROPOMI['time'] <= GC_enddate)       &
                        (TROPOMI['qa_value']  >= 0.5)          &
                        (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
-    # [****Why are we using local times here? Shouldn't we be using UTC?]
 
     # Number of TROPOMI observations
     NN = len(sat_ind[0])
@@ -494,11 +490,8 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         # Get the date and hour
         iSat = sat_ind[0][iNN] # lat index
         jSat = sat_ind[1][iNN] # lon index
-        timeshift = int(TROPOMI['longitude'][iSat,jSat]/15*60)
-        timeshift = 0 # Now I use UTC time instead of local time [****Why?]
-        localtime = TROPOMI['utctime'][iSat] + np.timedelta64(timeshift, 'm') # local time
-        localtime = pd.to_datetime(str(localtime))
-        strdate = localtime.round('60min').strftime('%Y%m%d_%H')        
+        time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
+        strdate = time.round('60min').strftime('%Y%m%d_%H')        
         all_strdate.append(strdate)
     all_strdate = list(set(all_strdate))
 
@@ -515,11 +508,8 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
         priori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]              # mol m-2
         AK = TROPOMI['column_AK'][iSat,jSat,:]
-        timeshift = int(TROPOMI['longitude'][iSat,jSat]/15*60)
-        timeshift = 0
-        localtime = TROPOMI['utctime'][iSat]+np.timedelta64(timeshift,'m')    # local time
-        localtime = pd.to_datetime(str(localtime))
-        strdate = localtime.round('60min').strftime('%Y%m%d_%H')        
+        time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
+        strdate = time.round('60min').strftime('%Y%m%d_%H')        
         GC = all_date_GC[strdate]
                 
         # Find GC lats & lons closest to the corners of the TROPOMI pixel
