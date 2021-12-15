@@ -20,7 +20,7 @@ def load_obj(name):
         return pickle.load(f)
 
 
-def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err=0.5, obs_err=15, gamma=0.25):
+def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err=0.5, obs_err=15, gamma=0.25, res='0.25x0.3125'):
     '''
     After running jacobian.py, use this script to perform the inversion and save out results.
 
@@ -44,9 +44,18 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     '''
 
     # Need to ignore data in the GEOS-Chem buffer zone
-    # Shave off one degree of latitude/longitude from each side of the domain
-    xlim = [lon_min+1, lon_max-1]
-    ylim = [lat_min+1, lat_max-1]
+    # Shave off one or two degrees of latitude/longitude from each side of the domain
+    # 1 degree if 0.25x0.3125 resolution, 2 degrees if 0.5x0.6125 resolution
+    if '0.25x0.3125' in res:
+        deg = 1
+    elif '0.5x0.625' in res:
+        deg = 2
+    else:
+        msg = "Bad input for res; must be '0.25x0.3125' or '0.5x0.625' "
+        raise ValueError(msg)
+        
+    xlim = [lon_min+deg, lon_max-deg]
+    ylim = [lat_min+deg, lat_max-deg]
 
     # Read output data from jacobian.py (virtual & true TROPOMI columns, Jacobian matrix)
     files = glob.glob(f'{jacobian_dir}/*.pkl')
@@ -164,9 +173,10 @@ if __name__ == '__main__':
     prior_err = float(sys.argv[8])
     obs_err = float(sys.argv[9])
     gamma = float(sys.argv[10])
+    res = sys.argv[11]
 
     # Run the inversion code
-    out = do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err, obs_err, gamma)
+    out = do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err, obs_err, gamma, res)
     xhat = out[0]
     ratio = out[1]
     all_part1 = out[2]
