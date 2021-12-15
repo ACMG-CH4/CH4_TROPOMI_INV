@@ -34,12 +34,15 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
         prior_err    [float] : Prior error standard deviation (default 0.5)
         obs_err      [float] : Observational error standard deviation (default 15 ppb)
         gamma        [float] : Regularization parameter (default 0.25)
+        res          [str]   : '0.25x0.3125' or '0.5x0.625' -- from config.yml
 
     Returns
         xhat         [float] : Posterior scaling factors
         ratio        [float] : Change from prior     [xhat = 1 + ratio]
         all_part1    [float] : K^T*inv(S_o)*K        [part of inversion equation]
         all_part2    [float] : K^T*inv(S_o)*(y-K*xA) [part of inversion equation]
+        S_post       [float] : Posterior error covariance matrix
+        A            [float] : Averaging kernel matrix
 
     '''
 
@@ -53,7 +56,7 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     else:
         msg = "Bad input for res; must be '0.25x0.3125' or '0.5x0.625' "
         raise ValueError(msg)
-        
+
     xlim = [lon_min+deg, lon_max-deg]
     ylim = [lat_min+deg, lat_max-deg]
 
