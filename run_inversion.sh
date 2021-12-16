@@ -8,6 +8,38 @@
 #SBATCH -o run_inversion_%j.out
 #SBATCH -e run_inversion_%j.err
 
+##=======================================================================
+## Parse config.yml file
+##=======================================================================
+
+printf "\n=== PARSING CONFIG FILE ===\n"
+
+# Function to parse yaml files from shell script
+# By Stefan Farestam via stackoverflow:
+# https://stackoverflow.com/questions/5014632/how-can-i-parse-a-yaml-file-from-a-linux-shell-script
+function parse_yaml {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\):|\1|" \
+        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
+}
+
+# Get configuration
+eval $(parse_yaml ../../../setup_CH4/config.yml)
+# This defines $PriorError, $ObsError, and $Gamma (in addition to the other config entries)
+# Parsing the config file here facilitates generation of inversion ensembles
+# All that needs to be done is to edit the config file for $PriorError, $ObsError, and $Gamma, then re-run this script
+
 #=======================================================================
 # Configuration
 #=======================================================================
@@ -112,7 +144,7 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 #=======================================================================
 
 printf "Calling jacobian.py\n"
-python jacobian.py $StartDate $EndDate $LonMin $LonMax $LatMin $LatMax $nElements $FetchTROPOMI; wait
+python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
@@ -124,14 +156,11 @@ LonMin={LON_MIN}
 LonMax={LON_MAX}
 LatMin={LAT_MIN}
 LatMax={LAT_MAX}
-PriorError={PRIOR_ERR}
-ObsError={OBS_ERR}
-Gamma={GAMMA}
 Res={RES}
 posteriorSF="./inversion_result.nc"
 
 printf "Calling invert.py\n"
-python invert.py $nElements $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma $Res; wait
+python invert.py $nElements $JacobianDir $posteriorSF $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $PriorError $ObsError $Gamma $Res; wait
 printf "DONE -- invert.py\n\n"
 
 #=======================================================================
