@@ -41,8 +41,19 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     statevector[:, (statevector.lon < lon_min) | (statevector.lon > lon_max)] = 0
     statevector[(statevector.lat < lat_min) | (statevector.lat > lat_max), :] = 0
 
+    # Also set pixels over water to 0
+    if land_threshold:
+        # Where there is no land, replace with 0
+        land = lc.where(lc > land_threshold)
+        statevector.values[land.isnull()] = 0
+
     # Fill in the NaNs with state vector element values
     statevector.values[statevector.isnull()] = np.arange(1, statevector.isnull().sum()+1)[::-1]
+
+    # Now set pixels over water to NaN
+    if land_threshold:
+        # Where there is no land, replace with NaN
+        statevector = statevector.where(lc > land_threshold)
 
     # Assign buffer pixels to state vector
     # -------------------------------------------------------------------------
@@ -62,7 +73,7 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     kmeans = KMeans(n_clusters=k_buffer_clust, random_state=0).fit(X)
     
     # Assign pixels to state vector
-    highres_statevector_max = np.max(statevector.values)
+    highres_statevector_max = np.nanmax(statevector.values)
     n_rows = statevector.shape[0]
     n_cols = statevector.shape[1]
     for r in range(n_rows):
@@ -70,10 +81,6 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
             if statevector[r,c].values == 0:
                 statevector[r,c] = kmeans.predict([[c,r]])[0] + 1 + highres_statevector_max
     # -------------------------------------------------------------------------
-
-    if land_threshold:
-        # Where there is no land, replace with NaN
-        statevector = statevector.where(lc > land_threshold)
 
     # Make dataset
     da_statevector = statevector.copy()
