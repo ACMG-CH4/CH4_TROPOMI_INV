@@ -127,10 +127,11 @@ LatMax={LAT_MAX}
 PriorError={PRIOR_ERR}
 ObsError={OBS_ERR}
 Gamma={GAMMA}
+Res={RES}
 posteriorSF="./inversion_result.nc"
 
 printf "Calling invert.py\n"
-python invert.py $nElements $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma; wait
+python invert.py $nElements $JacobianDir $posteriorSF $LonMin $LonMax $LatMin $LatMax $PriorError $ObsError $Gamma $Res; wait
 printf "DONE -- invert.py\n\n"
 
 #=======================================================================
