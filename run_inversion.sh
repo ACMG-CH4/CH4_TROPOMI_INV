@@ -71,7 +71,7 @@ else
     FetchTROPOMI=false
 fi
     
-# Only matters for Kalman filter multi-week inversions
+# Only matters for Kalman filter multi-week inversions, not yet implemented
 FirstSimSwitch=true
 
 # Load the Python environment
