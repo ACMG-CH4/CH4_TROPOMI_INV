@@ -41,7 +41,7 @@ eval $(parse_yaml ../../../setup_CH4/config.yml)
 # All that needs to be done is to edit the config file for $PriorError, $ObsError, and $Gamma, then re-run this script
 
 #=======================================================================
-# Configuration
+# Configuration (these settings generated on initial setup)
 #=======================================================================
 StartDate={START}
 EndDate={END}
