@@ -45,10 +45,10 @@ eval $(parse_yaml ../../../setup_CH4/config.yml)
 #=======================================================================
 StartDate={START}
 EndDate={END}
-LonMin={LON_MIN}
-LonMax={LON_MAX}
-LatMin={LAT_MIN}
-LatMax={LAT_MAX}
+LonMinInvDomain={LON_MIN}
+LonMaxInvDomain={LON_MAX}
+LatMinInvDomain={LAT_MIN}
+LatMaxInvDomain={LAT_MAX}
 nElements={STATE_VECTOR_ELEMENTS}
 nBufferClusters={BUFFER_CLUSTERS}
 MyPath={MY_PATH}
@@ -144,7 +144,8 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 #=======================================================================
 
 printf "Calling jacobian.py\n"
-python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI; wait
+useSensi="True"
+python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI $useSensi; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
@@ -152,10 +153,10 @@ printf " DONE -- jacobian.py\n\n"
 #=======================================================================
 
 # Set input values
-LonMin={LON_MIN}
-LonMax={LON_MAX}
-LatMin={LAT_MIN}
-LatMax={LAT_MAX}
+LonMinInvDomain={LON_MIN}
+LonMaxInvDomain={LON_MAX}
+LatMinInvDomain={LAT_MIN}
+LatMaxInvDomain={LAT_MAX}
 Res={RES}
 posteriorSF="./inversion_result.nc"
 
