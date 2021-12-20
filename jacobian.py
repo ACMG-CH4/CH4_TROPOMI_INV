@@ -773,7 +773,7 @@ if __name__ == '__main__':
     workdir = '.'
     Sensi_datadir = f'{workdir}/Sensi'
     Sat_datadir = f'{workdir}/data_TROPOMI'
-    if ~isPost:
+    if not isPost:
         use_Sensi = True
         GC_datadir = f'{workdir}/data_GC'
         outputdir = f'{workdir}/data_converted'
@@ -817,7 +817,7 @@ if __name__ == '__main__':
         date = re.split('\.',temp)[0]
         
         # If not yet processed, run use_AK_to_GC()
-        if ~os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
+        if not os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
             if correct_strato:
                 df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
