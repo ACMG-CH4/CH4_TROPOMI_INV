@@ -647,7 +647,7 @@ def download_TROPOMI(startdate, enddate):
     """
     # offline: 11/28/18 to end of 2020? + parts of 01/21
     # s3://meeo-s5p/OFFL/L2__CH4___/2018/MM/DD/*.nc
-    # reproccessed: 04/30/18 to 11/28/18
+    # reprocessed: 04/30/18 to 11/28/18
     # s3://meeo-s5p/RPRO/L2__CH4___/2018/MM/DD/*.nc
     # --no-sign-request
     start_str = str(startdate)
@@ -661,7 +661,7 @@ def download_TROPOMI(startdate, enddate):
     end_day = end_str[8:10]
 
     DATA_DOWNLOAD_SCRIPT='./auto_generated_download_script.sh'
-    cmd_prefix = "aws s3 cp --recursive "
+    cmd_prefix = "aws s3 sync "
     remote_root = "s3://meeo-s5p/"
     # access number of days in each month easily
     month_days = [31,[28,29],31,30,31,30,31,31,30,31,30,31]
@@ -762,13 +762,13 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
+    use_Sensi = bool(sys.argv[9])
  
     # Reformat start and end days for datetime in configuration
     start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
     end = f'{endday[0:4]}-{endday[4:6]}-{endday[6:8]} 23:59:59'
 
     # Configuration
-    use_Sensi = True
     correct_strato = False
     workdir = '.'
     Sensi_datadir = f'{workdir}/Sensi'

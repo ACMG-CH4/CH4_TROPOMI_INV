@@ -63,7 +63,22 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
             merged_data_LE.to_netcdf(final_file_LE)
 
     results = Parallel(n_jobs=-1)(delayed(process)(run) for run in rundirs)
+
+def fill_missing_hour_posterior(run_dirs_pth, prev_run_pth, start_day):
+    # Load hour zero from end of spinup run or previous posterior simulation
+    prev_file_SC = f'{prev_run_pth}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
+    prev_data_SC = xr.load_dataset(prev_file_SC)
         
+    # Load output SpeciesConc
+    output_file_SC = f'{run_dirs_pth}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0005z.nc4'
+    output_data_SC = xr.load_dataset(output_file_SC)
+        
+    # Merge output and copied datasets and replace original files that were missing the first hour
+    merged_data_SC = xr.merge([output_data_SC, prev_data_SC])
+    final_file_SC = f'{run_dirs_pth}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'
+    merged_data_SC.to_netcdf(final_file_SC)
+
+
 if __name__ == '__main__':
     import sys
 
@@ -72,4 +87,7 @@ if __name__ == '__main__':
     prev_run_pth = sys.argv[3]
     start_day = sys.argv[4]
     
-    fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day)
+    if 'posterior' in run_dirs_pth:
+        fill_missing_hour_posterior(run_dirs_pth, prev_run_pth, start_day)
+    else:
+        fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day)
