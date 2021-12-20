@@ -762,7 +762,7 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
-    use_Sensi = bool(sys.argv[9])
+    isPost = bool(sys.argv[9])
  
     # Reformat start and end days for datetime in configuration
     start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
@@ -773,8 +773,14 @@ if __name__ == '__main__':
     workdir = '.'
     Sensi_datadir = f'{workdir}/Sensi'
     Sat_datadir = f'{workdir}/data_TROPOMI'
-    GC_datadir = f'{workdir}/data_GC'
-    outputdir = f'{workdir}/data_converted'
+    if ~isPost:
+        use_Sensi = True
+        GC_datadir = f'{workdir}/data_GC'
+        outputdir = f'{workdir}/data_converted'
+    else: # if sampling posterior simulation
+        use_Sensi = False
+        GC_datadir = f'{workdir}/data_GC_posterior'
+        outputdir = f'{workdir}/data_converted_posterior'
     xlim = [lonmin,lonmax]
     ylim = [latmin,latmax]
     GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))

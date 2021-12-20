@@ -144,8 +144,8 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 #=======================================================================
 
 printf "Calling jacobian.py\n"
-useSensi="True"
-python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI $useSensi; wait
+isPost="False"
+python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI $isPost; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
