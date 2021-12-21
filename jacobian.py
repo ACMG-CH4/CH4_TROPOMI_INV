@@ -762,7 +762,7 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
-    isPost = bool(sys.argv[9])
+    isPost = sys.argv[9]
  
     # Reformat start and end days for datetime in configuration
     start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
@@ -773,7 +773,7 @@ if __name__ == '__main__':
     workdir = '.'
     Sensi_datadir = f'{workdir}/Sensi'
     Sat_datadir = f'{workdir}/data_TROPOMI'
-    if not isPost:
+    if isPost.lower() == 'false':
         use_Sensi = True
         GC_datadir = f'{workdir}/data_GC'
         outputdir = f'{workdir}/data_converted'
@@ -789,7 +789,7 @@ if __name__ == '__main__':
     print('End:', end)
 
     # Download TROPOMI data from AWS if requested
-    if bool(sys.argv[8]):
+    if sys.argv[8].lower() == 'true':
         download_TROPOMI(GC_startdate, GC_enddate)
     
     # Get TROPOMI data filenames for the desired date range
