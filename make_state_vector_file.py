@@ -57,13 +57,13 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
 
     # Assign buffer pixels to state vector
     # -------------------------------------------------------------------------
-    buffer_area = np.abs((statevector.values > 0) - 1)
-    
+    buffer_area = (statevector.values == 0)
+
     # Get image coordinates of all pixels in buffer area
     irows = np.arange(buffer_area.shape[0])
     icols = np.arange(buffer_area.shape[1])
     irows = np.transpose(np.tile(irows,(len(icols),1)))
-    icols = np.tile(icols,(len(irows),1)) * (buffer_area > 0)
+    icols = np.tile(icols,(len(irows),1))
     irows_good = irows[buffer_area > 0]
     icols_good = icols[buffer_area > 0]
     coords = [[icols_good[j], irows_good[j]] for j in range(len(irows_good))]
