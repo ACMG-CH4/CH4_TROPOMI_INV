@@ -47,15 +47,17 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
         land = lc.where(lc > land_threshold)
         statevector.values[land.isnull()] = 0
 
-    # Fill in the NaNs with state vector element values
+    # Fill in the remaining NaNs with state vector element values
     statevector.values[statevector.isnull()] = np.arange(1, statevector.isnull().sum()+1)[::-1]
 
-    # Now set pixels over water to NaN
+    # Now set pixels over water to missing_value = -9999
     if land_threshold:
-        # Where there is no land, replace with NaN
+        # First, where there is no land, replace with NaN
         statevector = statevector.where(lc > land_threshold)
+        # Fill with missing_value = -9999
+        statevector.values[statevector.isnull()] = -9999
 
-    # Assign buffer pixels to state vector
+    # Assign buffer pixels (the remaining 0's) to state vector
     # -------------------------------------------------------------------------
     buffer_area = (statevector.values == 0)
 
@@ -92,6 +94,8 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     ds_statevector.lon.attrs['units'] = 'degrees_east'
     ds_statevector.lon.attrs['long_name'] = 'Longitude'
     ds_statevector.StateVector.attrs['units'] = 'none'
+    ds_statevector.StateVector.attrs['missing_value'] = -9999
+    ds_statevector.StateVector.attrs['_FillValue'] = -9999
 
     # Save
     if save_pth:
