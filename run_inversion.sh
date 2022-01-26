@@ -42,15 +42,7 @@ StateVectorFile={STATE_VECTOR_PATH}
 SensiDir="./Sensi"
 GCDir="./data_GC"
 JacobianDir="./data_converted"
-TROPOMIDir="./data_TROPOMI"
-
-# Download TROPOMI data. Disable this setting if rerunning for a time period
-# to avoid redownloading existing data
-if "$isAWS"; then
-    FetchTROPOMI=true
-else
-    FetchTROPOMI=false
-fi
+Sat_datadir="${MyPath}/${RunName}/data_TROPOMI"
     
 # Only matters for Kalman filter multi-week inversions, not yet implemented
 FirstSimSwitch=true
@@ -126,7 +118,7 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 
 printf "Calling jacobian.py\n"
 isPost="False"
-python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $FetchTROPOMI $isPost; wait
+python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Sat_datadir $isPost; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================

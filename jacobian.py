@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import glob
 import numpy as np
 import xarray as xr
@@ -653,6 +654,7 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
+    Sat_datadir = sys.argv[8]
     isPost = sys.argv[9]
  
     # Reformat start and end days for datetime in configuration
@@ -663,7 +665,6 @@ if __name__ == '__main__':
     correct_strato = False
     workdir = '.'
     Sensi_datadir = f'{workdir}/Sensi'
-    Sat_datadir = f'{workdir}/data_TROPOMI'
     if isPost.lower() == 'false':
         use_Sensi = True
         GC_datadir = f'{workdir}/data_GC'
@@ -678,10 +679,6 @@ if __name__ == '__main__':
     GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
     print('Start:', start)
     print('End:', end)
-
-    # Download TROPOMI data from AWS if requested
-    if sys.argv[8].lower() == 'true':
-        download_TROPOMI(GC_startdate, GC_enddate, Sat_datadir)
     
     # Get TROPOMI data filenames for the desired date range
     allfiles = glob.glob(f'{Sat_datadir}/*.nc')

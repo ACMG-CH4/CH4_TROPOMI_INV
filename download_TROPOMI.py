@@ -113,3 +113,22 @@ def download_TROPOMI(startdate, enddate, Sat_datadir):
     # Remove the file afterwards
     status = subprocess.call(DATA_DOWNLOAD_SCRIPT)
     os.remove(DATA_DOWNLOAD_SCRIPT)
+
+if __name__ == '__main__':
+    import sys
+    import datetime
+    import numpy as np
+
+    startday = sys.argv[1]
+    endday = sys.argv[2]
+    Sat_datadir = sys.argv[3]
+
+    # Reformat start and end days for datetime in configuration
+    start = f'{startday[0:4]}-{startday[4:6]}-{startday[6:8]} 00:00:00'
+    end = f'{endday[0:4]}-{endday[4:6]}-{endday[6:8]} 23:59:59'
+
+    # Convert to datetime64
+    GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
+    GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
+
+    download_TROPOMI(GC_startdate, GC_enddate, Sat_datadir)
