@@ -636,13 +636,14 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
     
     return result
 
-def download_TROPOMI(startdate, enddate):
+def download_TROPOMI(startdate, enddate, Sat_datadir):
     """
     Download TROPOMI data from AWS for desired dates.
 
     Arguments
-        startdate   [np.datetime64]  : Start date of download range
-        enddate     [np.datetime64]  : End date of download range
+        startdate    [np.datetime64]  : Start date of download range
+        enddate      [np.datetime64]  : End date of download range
+        Sat_datadir  [str]            : TROPOMI data directory for storing data
 
     """
     # offline: 11/28/18 to end of 2020? + parts of 01/21
@@ -790,7 +791,7 @@ if __name__ == '__main__':
 
     # Download TROPOMI data from AWS if requested
     if sys.argv[8].lower() == 'true':
-        download_TROPOMI(GC_startdate, GC_enddate)
+        download_TROPOMI(GC_startdate, GC_enddate, Sat_datadir)
     
     # Get TROPOMI data filenames for the desired date range
     allfiles = glob.glob(f'{Sat_datadir}/*.nc')
