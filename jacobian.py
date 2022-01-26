@@ -10,7 +10,6 @@ import os
 import pandas as pd 
 import datetime
 from shapely.geometry import Polygon
-from download_TROPOMI import download_TROPOMI
 
 # Notes:
 # ======
