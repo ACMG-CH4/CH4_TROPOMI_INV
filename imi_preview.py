@@ -83,13 +83,17 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     startdate_np64 = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
     enddate_np64 = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
 
+    # Only consider tropomi files within date range (in case more are present)
+    tropomi_paths = [p for p in tropomi_paths if int(p.split('____')[1][0:8]) >= int(startday) and int(p.split('____')[1][0:8]) < int(endday)]
+    tropomi_paths.sort()
+
     # Open tropomi files and filter data
     lat = []
     lon = []
     xch4 = []
     albedo = []
     for j in range(len(tropomi_paths)):
-        
+
         # Load the TROPOMI data
         TROPOMI = read_tropomi(tropomi_paths[j])
         
@@ -122,7 +126,7 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     # Count the number of observations in the region of interest
     num_obs = count_obs_in_mask(mask, df)
     outstring2 = f'Found {num_obs} observations in the region of interest'
-    print(outstring2)
+    print('\n'+outstring2)
 
     # ----------------------------------
     # Estimate information content
@@ -159,7 +163,7 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
 
     outstring3 = f'k = {np.round(k,5)} kg-1 m2 s'
     outstring4 = f'a = {np.round(a,5)}'
-    outstring5 = f'expected dofs = {np.round(dofs,5)}'
+    outstring5 = f'expectedDOFS: {np.round(dofs,5)}'
     print(outstring3)
     print(outstring4)
     print(outstring5)
@@ -170,10 +174,10 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
 
     # Write preview diagnostics to text file
     outputtextfile = open(os.path.join(preview_dir,'preview_diagnostics.txt'),'w+')
-    outputtextfile.write(outstring1)
-    outputtextfile.write(outstring2)
-    outputtextfile.write(outstring3)
-    outputtextfile.write(outstring4)
+    outputtextfile.write('##'+outstring1+'\n')
+    outputtextfile.write('##'+outstring2+'\n')
+    outputtextfile.write('##'+outstring3+'\n')
+    outputtextfile.write('##'+outstring4+'\n')
     outputtextfile.write(outstring5)
     outputtextfile.close()
 
