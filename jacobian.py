@@ -522,6 +522,9 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
             jGC = nearest_loc(latitude_bounds[k], GC['lat'])
             corners_lon.append(iGC)
             corners_lat.append(jGC)
+        # If the tolerance in nearest_loc() is not satisfied, skip the observation 
+        if np.nan in corners_lon+corners_lat:
+            continue
         GC_ij = [(x,y) for x in set(corners_lon) for y in set(corners_lat)]
         GC_grids = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
         
