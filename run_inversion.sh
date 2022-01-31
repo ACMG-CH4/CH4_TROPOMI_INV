@@ -42,7 +42,7 @@ StateVectorFile={STATE_VECTOR_PATH}
 SensiDir="./Sensi"
 GCDir="./data_GC"
 JacobianDir="./data_converted"
-Sat_datadir="${MyPath}/${RunName}/data_TROPOMI"
+tropomiCache="${MyPath}/${RunName}/data_TROPOMI"
     
 # Only matters for Kalman filter multi-week inversions, not yet implemented
 FirstSimSwitch=true
@@ -118,7 +118,7 @@ printf "DONE -- setup_GCdatadir.py\n\n"
 
 printf "Calling jacobian.py\n"
 isPost="False"
-python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Sat_datadir $isPost; wait
+python jacobian.py $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $isPost; wait
 printf " DONE -- jacobian.py\n\n"
 
 #=======================================================================
