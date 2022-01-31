@@ -68,7 +68,7 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     # ----------------------------------
 
     # Paths to tropomi data files
-    tropomi_files = os.listdir(tropomi_cache)
+    tropomi_files = [f for f in os.listdir(tropomi_cache) if '.nc' in f]
     tropomi_paths = [os.path.join(tropomi_cache,f) for f in tropomi_files]
 
     # Latitude/longitude bounds of the inversion domain
@@ -115,7 +115,7 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
             albedo.append(TROPOMI['swir_albedo'][lat_idx,lon_idx])
         
         print(f'Reading TROPOMI file {j+1}/{len(tropomi_paths)}: {tropomi_paths[j]}', end='\r')
-
+    
     # Assemble in dataframe    
     df = pd.DataFrame()
     df['lat'] = lat
