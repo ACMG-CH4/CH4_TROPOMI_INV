@@ -2,6 +2,55 @@ import numpy as np
 import xarray as xr
 from sklearn.cluster import KMeans
 
+def get_nested_grid_bounds(land_cover_pth):
+    '''
+    Get the lat/lon bounds of the nested grid window (NA, EU, AS) for the inversion.
+    The land cover file path specifies the window.
+    '''
+
+    if 'NA' in land_cover_pth:
+        if 'GEOSFP' in land_cover_pth:
+            minLat_allowed = 9.75; maxLat_allowed = 60
+            minLon_allowed = -130; maxLon_allowed = -60
+        elif 'MERRA2' in land_cover_pth:
+            minLat_allowed = 10; maxLat_allowed = 70
+            minLon_allowed = -140; maxLon_allowed = -40
+    elif 'EU' in land_cover_pth:
+        if 'GEOSFP' in land_cover_pth:
+            minLat_allowed = 32.75; maxLat_allowed = 61.25
+            minLon_allowed = -15; maxLon_allowed = 40
+        elif 'MERRA2' in land_cover_pth:
+            minLat_allowed = 30; maxLat_allowed = 70
+            minLon_allowed = -30; maxLon_allowed = 50
+    elif 'AS' in land_cover_pth:
+        if 'GEOSFP' in land_cover_pth:
+            minLat_allowed = -11; maxLat_allowed = 55
+            minLon_allowed = 60; maxLon_allowed = 150
+        elif 'MERRA2' in land_cover_pth:
+            minLat_allowed = -11; maxLat_allowed = 55
+            minLon_allowed = 60; maxLon_allowed = 150
+    else:
+        raise ValueError("Land cover file path contains no NA/EU/AS token.")
+
+    return minLat_allowed, maxLat_allowed, minLon_allowed, maxLon_allowed
+
+
+def check_nested_grid_compatibility(lat_min, lat_max, lon_min, lon_max, land_cover_pth):
+    '''
+    Check whether input lat/lon bounds are compatible with (contained within) the nested grid window (NA, EU, or AS).
+    The land cover file path specifies the window.
+    '''
+
+    minLat_allowed, maxLat_allowed, minLon_allowed, maxLon_allowed = get_nested_grid_bounds(land_cover_pth)
+
+    if lat_min < minLat_allowed or lat_max > maxLat_allowed or lon_min < minLon_allowed or lon_max > maxLon_allowed:
+        compatible = False
+    else:
+        compatible = True
+
+    return compatible
+
+
 def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, lon_max, buffer_deg=5, land_threshold=0.25, k_buffer_clust=8):
     '''
     Generates the state vector file for an analytical inversion.
@@ -27,12 +76,24 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
     # Load land cover data
     lc = xr.open_dataset(land_cover_pth)
 
-    # Group together
+    # Group fields together
     lc = (lc['FRLAKE'] + lc['FRLAND'] + lc['FRLANDIC']).drop('time').squeeze()
     
-    # Subset the area of interest
-    lc = lc.isel(lon=lc.lon>=lon_min-buffer_deg, lat=lc.lat>=lat_min-buffer_deg)
-    lc = lc.isel(lon=lc.lon<=lon_max+buffer_deg, lat=lc.lat<=lat_max+buffer_deg)
+    # Check compatibility of region of interest with nesting window (NA, EU, AS)
+    compatible = check_nested_grid_compatibility(lat_min, lat_max, lon_min, lon_max, land_cover_pth)
+    if not compatible:
+        raise ValueError("Region of interest not contained within selected nesting REGION (NA, EU, AS; see config.yml).")
+
+    # Define bounds of inversion domain
+    minLat_allowed, maxLat_allowed, minLon_allowed, maxLon_allowed = get_nested_grid_bounds(land_cover_pth)
+    lon_min_inv_domain = np.max([lon_min-buffer_deg, minLon_allowed])
+    lon_max_inv_domain = np.min([lon_max+buffer_deg, maxLon_allowed])
+    lat_min_inv_domain = np.max([lat_min-buffer_deg, minLat_allowed])
+    lat_max_inv_domain = np.min([lat_max+buffer_deg, maxLat_allowed])
+
+    # Subset inversion domain using land cover file
+    lc = lc.isel(lon=lc.lon>=lon_min_inv_domain, lat=lc.lat>=lat_min_inv_domain)
+    lc = lc.isel(lon=lc.lon<=lon_max_inv_domain, lat=lc.lat<=lat_max_inv_domain)
 
     # Replace all values with NaN (to be filled later)
     statevector = lc.where(lc == -9999.)
