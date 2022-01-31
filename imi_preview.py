@@ -169,6 +169,27 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     print(outstring5)
 
     # ----------------------------------
+    # Estimate dollar cost
+    # ----------------------------------
+
+    # Estimate cost by scaling reference cost of $20 for one-month Permian inversion
+    # Reference number of state variables = 243
+    # Reference number of days = 31
+    reference_cost = 20
+    num_state_variables = np.nanmax(state_vector_labels.values)
+    num_days = np.round((enddate_np64-startdate_np64)/np.timedelta64(1, 'D'))
+    if config['Res'] == '0.25x0.3125':
+        res_factor = 1
+    elif config['Res'] == '0.5x0.625':
+        res_factor = 0.5
+    expected_cost = reference_cost * (num_state_variables/243)**2 * (num_days/31) * res_factor
+
+    outstring6 = f'approximate cost = ${int(np.round(expected_cost))} for on-demand instance'
+    outstring7 = f'                 = ${int(np.round(expected_cost)/3)} for spot instance'
+    print(outstring6)
+    print(outstring7)
+
+    # ----------------------------------
     # Output
     # ----------------------------------
 
@@ -178,6 +199,8 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     outputtextfile.write('##'+outstring2+'\n')
     outputtextfile.write('##'+outstring3+'\n')
     outputtextfile.write('##'+outstring4+'\n')
+    outputtextfile.write('##'+outstring6+'\n')
+    outputtextfile.write('##'+outstring7+'\n')
     outputtextfile.write(outstring5)
     outputtextfile.close()
 
