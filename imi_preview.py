@@ -184,8 +184,8 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
         res_factor = 0.5
     expected_cost = reference_cost * (num_state_variables/243)**2 * (num_days/31) * res_factor
 
-    outstring6 = f'approximate cost = ${int(np.round(expected_cost))} for on-demand instance'
-    outstring7 = f'                 = ${int(np.round(expected_cost)/3)} for spot instance'
+    outstring6 = f'approximate cost = ${np.round(expected_cost,2)} for on-demand instance'
+    outstring7 = f'                 = ${np.round(expected_cost/3,2)} for spot instance'
     print(outstring6)
     print(outstring7)
 
