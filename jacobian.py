@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import glob
+from multiprocessing.dummy import connection
 import numpy as np
 import xarray as xr
 import re
@@ -45,7 +46,7 @@ def read_tropomi(filename):
         filename [str]  : TROPOMI netcdf data file to read
 
     Returns
-        met      [dict] : Dictionary of important variables from TROPOMI:
+        dat      [dict] : Dictionary of important variables from TROPOMI:
                             - CH4
                             - Latitude
                             - Longitude
@@ -64,69 +65,69 @@ def read_tropomi(filename):
     """
 
     # Initialize dictionary for TROPOMI data
-    met = {}
+    dat = {}
     
     # Store methane, QA, lat, lon
-    data = xr.open_dataset(filename, group='PRODUCT')
-    met['methane'] = data['methane_mixing_ratio_bias_corrected'].values[0,:,:]
-    met['qa_value'] = data['qa_value'].values[0,:,:]
-    met['longitude'] = data['longitude'].values[0,:,:]
-    met['latitude'] = data['latitude'].values[0,:,:]
+    tropomi_data = xr.open_dataset(filename, group='PRODUCT')
+    dat['methane'] = tropomi_data['methane_mixing_ratio_bias_corrected'].values[0,:,:]
+    dat['qa_value'] = tropomi_data['qa_value'].values[0,:,:]
+    dat['longitude'] = tropomi_data['longitude'].values[0,:,:]
+    dat['latitude'] = tropomi_data['latitude'].values[0,:,:]
     
     # Store UTC time
-    referencetime = data['time'].values
-    delta_time = data['delta_time'][0].values
+    reference_time = tropomi_data['time'].values
+    delta_time = tropomi_data['delta_time'][0].values
     strdate = []
     if delta_time.dtype == '<m8[ns]':
-        strdate = referencetime+delta_time
+        strdate = reference_time+delta_time
     elif delta_time.dtype == '<M8[ns]':
         strdate = delta_time
     else:
         print(delta_time.dtype)
         pass
-    met['utctime'] = strdate
+    dat['utctime'] = strdate
     
     # Store time for whole orbit
-    times = np.zeros(shape=met['longitude'].shape, dtype='datetime64[ns]')
-    for kk in range(met['longitude'].shape[0]):
-        times[kk,:] = strdate[kk]
-    met['time'] = times
-    data.close()
+    times = np.zeros(shape=dat['longitude'].shape, dtype='datetime64[ns]')
+    for k in range(dat['longitude'].shape[0]):
+        times[k,:] = strdate[k]
+    dat['time'] = times
+    tropomi_data.close()
  
-    # Store column averaging kernel and SWIR, NIR surface albedo
-    data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/DETAILED_RESULTS')
-    met['column_AK'] = data['column_averaging_kernel'].values[0,:,:,::-1]
-    met['swir_albedo'] = data['surface_albedo_SWIR'].values[0,:,:]
-    met['nir_albedo'] = data['surface_albedo_NIR'].values[0,:,:]
-    met['blended_albedo'] = 2.4*met['nir_albedo'] - 1.13*met['swir_albedo']
-    data.close()
+    # Store column averaging kernel, SWIR and NIR surface albedo
+    tropomi_data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/DETAILED_RESULTS')
+    dat['column_AK'] = tropomi_data['column_averaging_kernel'].values[0,:,:,::-1]
+    dat['swir_albedo'] = tropomi_data['surface_albedo_SWIR'].values[0,:,:]
+    dat['nir_albedo'] = tropomi_data['surface_albedo_NIR'].values[0,:,:]
+    dat['blended_albedo'] = 2.4*dat['nir_albedo'] - 1.13*dat['swir_albedo']
+    tropomi_data.close()
     
     # Store methane prior profile, dry air subcolumns
-    data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/INPUT_DATA')
-    met['methane_profile_apriori'] = data['methane_profile_apriori'].values[0,:,:,::-1] # mol m-2
-    met['dry_air_subcolumns'] = data['dry_air_subcolumns'].values[0,:,:,::-1]           # mol m-2
+    tropomi_data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/INPUT_DATA')
+    dat['methane_profile_apriori'] = tropomi_data['methane_profile_apriori'].values[0,:,:,::-1] # mol m-2
+    dat['dry_air_subcolumns'] = tropomi_data['dry_air_subcolumns'].values[0,:,:,::-1]           # mol m-2
     
     # Also get pressure interval and surface pressure for use below
-    pressure_interval = data['pressure_interval'].values[0,:,:]/100                     # Pa -> hPa
-    surface_pressure = data['surface_pressure'].values[0,:,:]/100                       # Pa -> hPa
-    data.close()
+    pressure_interval = tropomi_data['pressure_interval'].values[0,:,:]/100                     # Pa -> hPa
+    surface_pressure = tropomi_data['surface_pressure'].values[0,:,:]/100                       # Pa -> hPa
+    tropomi_data.close()
 
-    # Store lat, lon bounds for pixels
-    data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/GEOLOCATIONS')
-    met['longitude_bounds'] = data['longitude_bounds'].values[0,:,:,:]
-    met['latitude_bounds'] = data['latitude_bounds'].values[0,:,:,:]
-    data.close()
+    # Store latitude and longitude bounds for pixels
+    tropomi_data = xr.open_dataset(filename, group='PRODUCT/SUPPORT_DATA/GEOLOCATIONS')
+    dat['longitude_bounds'] = tropomi_data['longitude_bounds'].values[0,:,:,:]
+    dat['latitude_bounds'] = tropomi_data['latitude_bounds'].values[0,:,:,:]
+    tropomi_data.close()
     
     # Store vertical pressure profile
-    N1 = met['methane'].shape[0]
-    N2 = met['methane'].shape[1]
-    pressures = np.zeros([N1,N2,13], dtype=np.float32)
+    N1 = dat['methane'].shape[0]
+    N2 = dat['methane'].shape[1]
+    pressures = np.zeros([N1,N2,12+1], dtype=np.float32)
     pressures.fill(np.nan)
     for i in range(12+1):
         pressures[:,:,i] = surface_pressure - i*pressure_interval
-    met['pressures'] = pressures
+    dat['pressures'] = pressures
     
-    return met
+    return dat
 
 
 def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
@@ -149,7 +150,7 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
                                  ACE-FTS
     
     Returns
-        met            [dict]  : Dictionary of important variables from GEOS-Chem:
+        dat            [dict]  : Dictionary of important variables from GEOS-Chem:
                                     - CH4
                                     - Latitude
                                     - Longitude
@@ -166,30 +167,30 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
     
     # Read lat, lon, CH4 from the SpeciecConc collection
     filename = f'{GC_datadir}/{file_species}'
-    data = xr.open_dataset(filename)
-    LON = data['lon'].values
-    LAT = data['lat'].values
-    CH4 = data['SpeciesConc_CH4'].values[0,:,:,:]
+    gc_data = xr.open_dataset(filename)
+    LON = gc_data['lon'].values
+    LAT = gc_data['lat'].values
+    CH4 = gc_data['SpeciesConc_CH4'].values[0,:,:,:]
     CH4 = CH4*1e9                                    # Convert to ppb
     CH4 = np.einsum('lij->jil', CH4)
-    data.close()
+    gc_data.close()
 
     # Read PEDGE from the LevelEdgeDiags collection
     filename = f'{GC_datadir}/{file_pedge}'
-    data = xr.open_dataset(filename)
-    PEDGE = data['Met_PEDGE'].values[0,:,:,:]
+    gc_data = xr.open_dataset(filename)
+    PEDGE = gc_data['Met_PEDGE'].values[0,:,:,:]
     PEDGE = np.einsum('lij->jil', PEDGE)
-    data.close()
+    gc_data.close()
     
     # If want to do latitudinal correction of stratospheric bias in GEOS-Chem:
     if correct_strato:
         
         # Read tropopause level from StateMet collection
         filename = f'{GC_datadir}/{file_troppause}'
-        data = xr.open_dataset(filename)
-        TROPP = data['Met_TropLev'].values[0,:,:]
+        gc_data = xr.open_dataset(filename)
+        TROPP = gc_data['Met_TropLev'].values[0,:,:]
         TROPP = np.einsum('ij->ji', TROPP)
-        data.close()
+        gc_data.close()
 
         CH4_adjusted = CH4.copy()
         for i in range(len(LON)):
@@ -200,26 +201,26 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
                 CH4_adjusted[i,j,l:] = CH4[i,j,l:]*lat_ratio[ind,month-1]
     
     # Store GC data in dictionary
-    met = {}
-    met['lon'] = LON
-    met['lat'] = LAT
-    met['PEDGE'] = PEDGE
-    met['CH4'] = CH4
+    dat = {}
+    dat['lon'] = LON
+    dat['lat'] = LAT
+    dat['PEDGE'] = PEDGE
+    dat['CH4'] = CH4
     if correct_strato:
-        met['TROPP'] = TROPP
-        met['CH4_adjusted'] = CH4_adjusted
+        dat['TROPP'] = TROPP
+        dat['CH4_adjusted'] = CH4_adjusted
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
     if use_Sensi:
         filename = f'{Sensi_datadir}/Sensi_{date}.nc'
-        data = xr.open_dataset(filename)
-        Sensi = data['Sensitivities'].values
+        sens_data = xr.open_dataset(filename)
+        Sensi = sens_data['Sensitivities'].values
         Sensi = np.einsum('klji->ijlk', Sensi)
-        data.close()
+        sens_data.close()
         # Now adjust the Sensitivity
-        met['Sensi'] = Sensi
+        dat['Sensi'] = Sensi
 
-    return met
+    return dat
 
 
 def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
@@ -231,156 +232,157 @@ def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, co
         allstr_date [list, str] : date strings 
 
     Returns
-        met         [dict]      : Dictionary of dictionaries. Each
+        dat         [dict]      : Dictionary of dictionaries. Each
                                   sub-dictionary is returned by read_GC()
     """
 
-    met={}
+    dat={}
     for strdate in all_strdate:
-        met[strdate] = read_GC(strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
+        dat[strdate] = read_GC(strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
     
-    return met
+    return dat
 
 
-def cal_weights(Sat_p, GC_p):
+def merge_pressure_grids(p_sat, p_gc):
     """
-    Calculate pressure weights for TROPOMI & GEOS-Chem on a merged vertical (pressure) grid
+    Merge TROPOMI & GEOS-Chem vertical pressure grids
 
     Arguments
-        Sat_p   [float]    : Pressure edges from TROPOMI (13)          <--- 13-1 = 12 pressure levels
-        GC_p    [float]    : Pressure edges from GEOS-Chem (48)        <--- 48-1 = 47 pressure levels
+        p_sat   [float]    : Pressure edges from TROPOMI (13 edges)     <--- 13-1 = 12 pressure layers
+        p_gc    [float]    : Pressure edges from GEOS-Chem (48 edges)   <--- 48-1 = 47 pressure layers
 
     Returns
-        weights [dict]     : Pressure weights dictionary
-                                - Com_p     : merged pressure-edge grid 
-                                - data_type : for each pressure edge in the merged grid, 
-                                              is it from GC or TROPOMI?
-                                - location  : index of pressure edge
-                                - first_2   : index of first GEOS-Chem pressure edge in
-                                              the merged grid
+        merged  [dict]     : Merged grid dictionary
+                                - p_merge       : merged pressure-edge grid 
+                                - data_type     : for each pressure edge in the merged grid, 
+                                                  is it from GC or TROPOMI?
+                                - edge_index    : indexes of pressure edges
+                                - first_gc_edge : index of first GEOS-Chem pressure edge in
+                                                  the merged grid
     """
 
-    # Combine Sat_p and GC_p into merged vertical grid
-    Com_p = np.zeros(len(Sat_p)+len(GC_p))
-    Com_p.fill(np.nan)
-    data_type = np.zeros(len(Sat_p)+len(GC_p), dtype=int) 
+    # Combine p_sat and p_gc into merged vertical pressure grid
+    p_merge = np.zeros(len(p_sat)+len(p_gc))
+    p_merge.fill(np.nan)
+    data_type = np.zeros(len(p_sat)+len(p_gc), dtype=int) 
     data_type.fill(-99)
-    location = []
-    i=0;j=0;k=0
-    while ((i < len(Sat_p)) or (j < len(GC_p))):
-        if i == len(Sat_p):
-            Com_p[k] = GC_p[j]
-            data_type[k] = 2
+    edge_index = []
+    i=0; j=0; k=0
+    while ((i < len(p_sat)) or (j < len(p_gc))):
+        if i == len(p_sat):
+            p_merge[k] = p_gc[j]
+            data_type[k] = 2      # geos-chem edge
             j=j+1; k=k+1
             continue
-        if j == len(GC_p):
-            Com_p[k] = Sat_p[i]
-            data_type[k] = 1  
-            location.append(k)        
+        if j == len(p_gc):
+            p_merge[k] = p_sat[i]
+            data_type[k] = 1      # tropomi edge
+            edge_index.append(k)        
             i=i+1; k=k+1   
             continue
-        if Sat_p[i] >= GC_p[j]:
-            Com_p[k] = Sat_p[i]
-            data_type[k] = 1        
-            location.append(k)        
+        if p_sat[i] >= p_gc[j]:
+            p_merge[k] = p_sat[i]
+            data_type[k] = 1      # tropomi edge   
+            edge_index.append(k)        
             i=i+1; k=k+1
         else:
-            Com_p[k] = GC_p[j]
-            data_type[k] = 2
+            p_merge[k] = p_gc[j]
+            data_type[k] = 2      # geos-chem edge
             j=j+1; k=k+1
     
-    # Find the first level of GC
-    first_2 = -99
-    for i in range(len(Sat_p)+len(GC_p)-1):
+    # Find the first GEOS-Chem pressure edge
+    first_gc_edge = -99
+    for i in range(len(p_sat)+len(p_gc)-1):
         if data_type[i] == 2:
-            first_2 = i
+            first_gc_edge = i
             break    
     
     # Save data to dictionary
-    weights = {}
-    weights['data_type'] = data_type
-    weights['Com_p'] = Com_p
-    weights['location'] = location
-    weights['first_2'] = first_2
+    merged = {}
+    merged['p_merge'] = p_merge
+    merged['data_type'] = data_type
+    merged['edge_index'] = edge_index
+    merged['first_gc_edge'] = first_gc_edge
     
-    return weights
+    return merged
 
 
-def remap(GC_CH4, data_type, Com_p, location, first_2):
+def remap(GC_CH4, data_type, p_merge, edge_index, first_gc_edge):
     """
     Remap GEOS-Chem methane to the TROPOMI vertical grid.
 
     Arguments
-        GC_CH4    [float]   : Methane from GEOS-Chem
-        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from cal_weights()
-        data_type [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from cal_weights()
-        location  [int]     : Indexes of pressure edges, from cal_weights()
-        first_2   [int]     : Index of first GEOS-Chem pressure edge in merged grid, from cal_weights()
+        GC_CH4        [float]   : Methane from GEOS-Chem
+        p_merge       [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
+        data_type     [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from merge_pressure_grids()
+        edge_index    [int]     : Indexes of pressure edges, from merge_pressure_grids()
+        first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
+        Sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
     """
     
-    # Define XCH4 in the layers of the merged pressure grid
-    conc = np.zeros(len(Com_p)-1,); conc.fill(np.nan)
+    # Define CH4 concentrations in the layers of the merged pressure grid
+    conc = np.zeros(len(p_merge)-1,)
+    conc.fill(np.nan)
     k=0
-    for i in range(first_2, len(Com_p)-1):
+    for i in range(first_gc_edge, len(p_merge)-1):
         conc[i] = GC_CH4[k]
         if data_type[i+1] == 2:
             k=k+1
-    if first_2 > 0:
-        conc[:first_2] = conc[first_2]
+    if first_gc_edge > 0:
+        conc[:first_gc_edge] = conc[first_gc_edge]
     
     # Calculate the weighted mean methane for each TROPOMI layer
-    delta_p = Com_p[:-1] - Com_p[1:]
+    delta_p = p_merge[:-1] - p_merge[1:]
     Sat_CH4 = np.zeros(12); Sat_CH4.fill(np.nan)
-    for i in range(len(location)-1):
-        start = location[i]
-        end = location[i+1]
-        fenzi = sum(conc[start:end]*delta_p[start:end])
-        fenmu = sum(delta_p[start:end])
-        Sat_CH4[i] = fenzi/fenmu   
+    for i in range(len(edge_index)-1):
+        start = edge_index[i]
+        end = edge_index[i+1]
+        sum_conc_times_pressure_weights = sum(conc[start:end]*delta_p[start:end])
+        sum_pressure_weights = sum(delta_p[start:end])
+        Sat_CH4[i] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
     
     return Sat_CH4
 
 
-def remap2(Sensi, data_type, Com_p, location, first_2):
+def remap2(Sensi, data_type, p_merge, edge_index, first_gc_edge):
     """
     Remap GEOS-Chem sensitivity data (from perturbation simulations) to the TROPOMI vertical grid.
 
     Arguments
-        Sensi     [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster) ****double-check dim order
-        Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from cal_weights()
-        data_type [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from cal_weights()
-        location  [int]     : Indexes of pressure edges, from cal_weights()
-        first_2   [int]     : Index of first GEOS-Chem pressure edge in merged grid, from cal_weights()
+        Sensi         [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster) ****double-check dim order
+        p_merge       [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
+        data_type     [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from merge_pressure_grids()
+        edge_index    [int]     : Indexes of pressure edges, from merge_pressure_grids()
+        first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        Sat_CH4   [float]   : GC methane in TROPOMI pressure coordinates
+        Sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
     """
     
     # Define XCH4 in the layers of the merged pressure grid
     MM = Sensi.shape[1]
-    conc = np.zeros((len(Com_p)-1, MM))
+    conc = np.zeros((len(p_merge)-1, MM))
     conc.fill(np.nan)
     k=0
-    for i in range(first_2, len(Com_p)-1):
+    for i in range(first_gc_edge, len(p_merge)-1):
         conc[i,:] = Sensi[k,:]
         if data_type[i+1] == 2:
             k=k+1
-    if first_2 > 0:
-        conc[:first_2,:] = conc[first_2,:]
+    if first_gc_edge > 0:
+        conc[:first_gc_edge,:] = conc[first_gc_edge,:]
     
     # Calculate the weighted mean methane for each layer
-    delta_p = Com_p[:-1] - Com_p[1:]
+    delta_p = p_merge[:-1] - p_merge[1:]
     delta_ps = np.transpose(np.tile(delta_p, (MM,1)))
     Sat_CH4 = np.zeros((12, MM)); Sat_CH4.fill(np.nan)
-    for i in range(len(location)-1):
-        start = location[i]
-        end = location[i+1]
-        fenzi = np.sum(conc[start:end,:]*delta_ps[start:end,:],0)
-        fenmu = np.sum(delta_p[start:end])
-        Sat_CH4[i,:] = fenzi/fenmu
+    for i in range(len(edge_index)-1):
+        start = edge_index[i]
+        end = edge_index[i+1]
+        sum_conc_times_pressure_weights = np.sum(conc[start:end,:]*delta_ps[start:end,:],0)
+        sum_pressure_weights = np.sum(delta_p[start:end])
+        Sat_CH4[i,:] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
     
     return Sat_CH4
 
@@ -480,9 +482,9 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         # Get GC data for the date of the observation:
         iSat = sat_ind[0][iNN]
         jSat = sat_ind[1][iNN]
-        Sat_p = TROPOMI['pressures'][iSat,jSat,:]
+        p_sat = TROPOMI['pressures'][iSat,jSat,:]
         dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
-        priori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]              # mol m-2
+        apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]              # mol m-2
         AK = TROPOMI['column_AK'][iSat,jSat,:]
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
@@ -540,7 +542,7 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
             iGC,jGC = GC_ij[ipixel]
             
             # Get GC pressure edges for the cell
-            GC_p = GC['PEDGE'][iGC,jGC,:]
+            p_gc = GC['PEDGE'][iGC,jGC,:]
             
             # Get GC methane for the cell
             if correct_strato:
@@ -548,18 +550,18 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
             else:
                 GC_CH4 = GC['CH4'][iGC,jGC,:]
                 
-            # Calculate pressure weights for the cell
-            ww = cal_weights(Sat_p, GC_p)
+            # Get merged GEOS-Chem/TROPOMI pressure grid for the cell
+            merged = merge_pressure_grids(p_sat, p_gc)
             
-            # Map GC methane to TROPOMI pressure levels
-            Sat_CH4 = remap(GC_CH4, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2'])   # ppb
+            # Remap GC methane to TROPOMI pressure levels
+            Sat_CH4 = remap(GC_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
             
             # Convert ppb to mol m-2
             Sat_CH4_2 = Sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
-            # Using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
-            tropomi_sees_ipixel = sum(priori + AK * (Sat_CH4_2-priori)) / sum(dry_air_subcolumns) * 1e9   # ppb
+            # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
+            tropomi_sees_ipixel = sum(apriori + AK * (Sat_CH4_2-apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             
             # Weight by overlapping area (to be divided out later) and add to sum
             GC_base_posteri += overlap_area[ipixel] * tropomi_sees_ipixel  # ppb m2
@@ -572,7 +574,7 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
                 Sensi = GC['Sensi'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
-                Sat_CH4 = remap2(Sensi, ww['data_type'], ww['Com_p'], ww['location'], ww['first_2'])      # mixing ratio, unitless
+                Sat_CH4 = remap2(Sensi, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])      # mixing ratio, unitless
                 
                 # Tile the TROPOMI averaging kernel
                 AKs = np.transpose(np.tile(AK, (n_elements,1)))
