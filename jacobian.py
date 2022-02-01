@@ -57,20 +57,20 @@ def read_tropomi(filename):
     Returns
         met      [dict] : Dictionary of important variables from TROPOMI:
                             - CH4
- 			                - Latitude
+                            - Latitude
                             - Longitude
                             - QA value
- 			                - UTC time
- 			                - Time (utc time reshaped for orbit)
-			                - Averaging kernel
+                            - UTC time
+                            - Time (utc time reshaped for orbit)
+                            - Averaging kernel
                             - SWIR albedo
                             - NIR albedo
                             - Blended albedo
-			                - CH4 prior profile
-			                - Dry air subcolumns
-			                - Latitude bounds
- 			                - Longitude bounds
-			                - Vertical pressure profile
+                            - CH4 prior profile
+                            - Dry air subcolumns
+                            - Latitude bounds
+                            - Longitude bounds
+                            - Vertical pressure profile
     """
 
     # Initialize dictionary for TROPOMI data
@@ -136,7 +136,7 @@ def read_tropomi(filename):
         pressures[:,:,i] = surface_pressure - i*pressure_interval
     met['pressures'] = pressures
     
-    return met    
+    return met
 
 
 # -----------------------------------------------------------------------------

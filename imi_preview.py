@@ -10,7 +10,8 @@ import os
 import datetime
 import cartopy.crs as ccrs
 import colorcet as cc
-from utils import calculate_gridcell_areas, sum_total_emissions, read_tropomi, count_obs_in_mask, plot_field
+from utils import calculate_gridcell_areas, sum_total_emissions, count_obs_in_mask, plot_field
+from jacobian import read_tropomi
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
