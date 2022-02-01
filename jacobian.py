@@ -23,12 +23,6 @@ from shapely.geometry import Polygon
 # - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
 #   virtual TROPOMI column [ppb] in use_AK_to_GC().
 
-# =============================================================================
-#
-#                                      Define functions
-#
-# =============================================================================
-
 def save_obj(obj, name):
     """ Save something with Pickle. """
     
@@ -36,16 +30,12 @@ def save_obj(obj, name):
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
-# -----------------------------------------------------------------------------
-
 def load_obj(name):
     """ Load something with Pickle. """
 
     with open( name, 'rb') as f:
         return pickle.load(f)
 
-
-# -----------------------------------------------------------------------------
     
 def read_tropomi(filename):
     """
@@ -139,8 +129,6 @@ def read_tropomi(filename):
     return met
 
 
-# -----------------------------------------------------------------------------
-
 def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
@@ -162,7 +150,7 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
     
     Returns
         met            [dict]  : Dictionary of important variables from GEOS-Chem:
-			                        - CH4
+                                    - CH4
                                     - Latitude
                                     - Longitude
                                     - PEDGE
@@ -234,14 +222,12 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
     return met
 
 
-# -----------------------------------------------------------------------------
-
 def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """ 
     Call read_GC() for multiple dates in a loop. 
 
     Arguments
-    Same as read_GC(), except instead of 'date' argument, use 
+    [Same as read_GC(), except instead of 'date' argument, use:]
         allstr_date [list, str] : date strings 
 
     Returns
@@ -255,8 +241,6 @@ def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, co
     
     return met
 
-
-# -----------------------------------------------------------------------------
 
 def cal_weights(Sat_p, GC_p):
     """
@@ -322,14 +306,12 @@ def cal_weights(Sat_p, GC_p):
     return weights
 
 
-# -----------------------------------------------------------------------------
-
 def remap(GC_CH4, data_type, Com_p, location, first_2):
     """
     Remap GEOS-Chem methane to the TROPOMI vertical grid.
 
     Arguments
-        GC_CH4    [float]   : Methane from GEOS-Chem (60) <---- 60 pressure levels?
+        GC_CH4    [float]   : Methane from GEOS-Chem
         Com_p     [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from cal_weights()
         data_type [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from cal_weights()
         location  [int]     : Indexes of pressure edges, from cal_weights()
@@ -361,8 +343,6 @@ def remap(GC_CH4, data_type, Com_p, location, first_2):
     
     return Sat_CH4
 
-
-# -----------------------------------------------------------------------------
 
 def remap2(Sensi, data_type, Com_p, location, first_2):
     """
@@ -405,8 +385,6 @@ def remap2(Sensi, data_type, Com_p, location, first_2):
     return Sat_CH4
 
 
-# -----------------------------------------------------------------------------
-
 def nearest_loc(loc_query, loc_grid, tolerance=0.5):
     """ Find the index of the nearest grid location to a query location, with some tolerance. """
 
@@ -417,8 +395,6 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
     else:
         return ind
 
-
-# -----------------------------------------------------------------------------
 
 def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
@@ -449,10 +425,10 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
     Returns
         result         [dict]       : Dictionary with one or two fields:
  	   	 		                        - obs_GC : GEOS-Chem and TROPOMI methane data
-	 					                            - TROPOMI methane
-						                            - GC methane
-						                            - TROPOMI lat, lon
-						                            - TROPOMI lat index, lon index
+                                                    - TROPOMI methane
+                                                    - GC methane
+                                                    - TROPOMI lat, lon
+                                                    - TROPOMI lat index, lon index
 				                      If use_Sensi=True, also include:
 				                        - KK     : Jacobian matrix
     """
@@ -640,11 +616,7 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
     return result
 
 
-# =============================================================================
-#
-#                                      Run the code
-#
-# =============================================================================
+
 
 if __name__ == '__main__':
     import sys
