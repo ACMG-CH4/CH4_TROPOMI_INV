@@ -137,17 +137,11 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
     Arguments
         date           [str]   : date of interest
         GC_datadir     [str]   : Path to GC output data
-        use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities
-                                 to TROPOMI observation space?
-        Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC
-                                 sensitivity data
-        correct_strato [log]   : Are we doing a latitudinal correction of
-                                 GEOS-Chem stratospheric bias? 
-        lat_mid        [float] : If correct_strato=True, this is the center
-                                 latitude of each grid box
-        lat_ratio      [float] : If correct_strato=True, this is the ratio for
-                                 correcting GC stratospheric methane to match
-                                 ACE-FTS
+        use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC sensitivity data
+        correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
+        lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
+        lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
     
     Returns
         dat            [dict]  : Dictionary of important variables from GEOS-Chem:
@@ -228,12 +222,16 @@ def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, co
     Call read_GC() for multiple dates in a loop. 
 
     Arguments
-    [Same as read_GC(), except instead of 'date' argument, use:]
-        allstr_date [list, str] : date strings 
+        allstr_date    [list, str] : date strings
+        GC_datadir     [str]       : Path to GC output data
+        use_Sensi      [log]       : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        Sensi_datadir  [str]       : If use_Sensi=True, this is the path to the GC sensitivity data
+        correct_strato [log]       : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
+        lat_mid        [float]     : If correct_strato=True, this is the center latitude of each grid box
+        lat_ratio      [float]     : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
 
     Returns
-        dat         [dict]      : Dictionary of dictionaries. Each
-                                  sub-dictionary is returned by read_GC()
+        dat            [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC()
     """
 
     dat={}
@@ -254,11 +252,9 @@ def merge_pressure_grids(p_sat, p_gc):
     Returns
         merged  [dict]     : Merged grid dictionary
                                 - p_merge       : merged pressure-edge grid 
-                                - data_type     : for each pressure edge in the merged grid, 
-                                                  is it from GC or TROPOMI?
+                                - data_type     : for each pressure edge in the merged grid, is it from GC or TROPOMI?
                                 - edge_index    : indexes of pressure edges
-                                - first_gc_edge : index of first GEOS-Chem pressure edge in
-                                                  the merged grid
+                                - first_gc_edge : index of first GEOS-Chem pressure edge in the merged grid
     """
 
     # Combine p_sat and p_gc into merged vertical pressure grid
@@ -405,24 +401,16 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
         n_elements     [int]        : Number of state vector elements
-        GC_startdate   [datetime64] : First day of inversion period, for GC and
-                                      TROPOMI
-        GC_enddate     [datetime64] : Last day of inversion period, for GC and
-                                      TROPOMI
+        GC_startdate   [datetime64] : First day of inversion period, for GC and TROPOMI
+        GC_enddate     [datetime64] : Last day of inversion period, for GC and TROPOMI
         xlim           [float]      : Longitude bounds for simulation domain
         ylim           [float]      : Latitude bounds for simulation domain
         GC_datadir     [str]        : Path to GC output data
-        use_Sensi      [log]        : Are we trying to map GEOS-Chem
-                                      sensitivities to TROPOMI observation space?
-        Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the
-                                      GC sensitivity data
-        correct_strato [log]        : Are we doing a latitudinal correction of
-                                      GEOS-Chem stratospheric bias?
-        lat_mid        [float]      : If correct_strato=True, this is the center
-                                      latitude of each grid box
-        lat_ratio      [float]      : If correct_strato=True, this is the ratio
-                                      for correcting GC stratospheric methane to
-                                      match ACE-FTS
+        use_Sensi      [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
+        correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
+        lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
+        lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
 
     Returns
         result         [dict]       : Dictionary with one or two fields:
