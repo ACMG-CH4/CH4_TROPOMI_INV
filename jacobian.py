@@ -107,9 +107,9 @@ def read_tropomi(filename):
     tropomi_data.close()
     
     # Store vertical pressure profile
-    N1 = dat['methane'].shape[0] # length of along-track dimension (scanline) of retrieval field
-    N2 = dat['methane'].shape[1] # length of across-track dimension (ground_pixel) of retrieval field
-    pressures = np.zeros([N1,N2,12+1], dtype=np.float32)
+    n1 = dat['methane'].shape[0] # length of along-track dimension (scanline) of retrieval field
+    n2 = dat['methane'].shape[1] # length of across-track dimension (ground_pixel) of retrieval field
+    pressures = np.zeros([n1,n2,12+1], dtype=np.float32)
     pressures.fill(np.nan)
     for i in range(12+1):
         pressures[:,:,i] = surface_pressure - i*pressure_interval
@@ -462,44 +462,44 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
         p_sat = TROPOMI['pressures'][iSat,jSat,:]
         dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
         apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]             # mol m-2
-        AK = TROPOMI['column_AK'][iSat,jSat,:]
+        avkern = TROPOMI['column_AK'][iSat,jSat,:]
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
-        GC = all_date_gc[strdate]
+        GEOSCHEM = all_date_gc[strdate]
                 
         # Find GEOS-Chem lats & lons closest to the corners of the TROPOMI pixel
         longitude_bounds = TROPOMI['longitude_bounds'][iSat,jSat,:]
         latitude_bounds = TROPOMI['latitude_bounds'][iSat,jSat,:]
-        corners_lon = []
-        corners_lat = []
+        corners_lon_index = []
+        corners_lat_index = []
         for l in range(4):
-            iGC = nearest_loc(longitude_bounds[l], GC['lon'])
-            jGC = nearest_loc(latitude_bounds[l], GC['lat'])
-            corners_lon.append(iGC)
-            corners_lat.append(jGC)
+            iGC = nearest_loc(longitude_bounds[l], GEOSCHEM['lon'])
+            jGC = nearest_loc(latitude_bounds[l], GEOSCHEM['lat'])
+            corners_lon_index.append(iGC)
+            corners_lat_index.append(jGC)
         # If the tolerance in nearest_loc() is not satisfied, skip the observation 
-        if np.nan in corners_lon+corners_lat:
+        if np.nan in corners_lon_index+corners_lat_index:
             continue
         # Get lat/lon indexes and coordinates of GEOS-Chem grid cells closest to the TROPOMI corners
-        GC_ij = [(x,y) for x in set(corners_lon) for y in set(corners_lat)]
-        GC_coords = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
+        ij_GC = [(x,y) for x in set(corners_lon_index) for y in set(corners_lat_index)]
+        gc_coords = [(GEOSCHEM['lon'][i], GEOSCHEM['lat'][j]) for i,j in ij_GC]
         
         # Compute the overlapping area between the TROPOMI pixel and GEOS-Chem grid cells it touches
-        overlap_area = np.zeros(len(GC_coords))
-        dlon = GC['lon'][1]-GC['lon'][0]
-        dlat = GC['lat'][1]-GC['lat'][0]
+        overlap_area = np.zeros(len(gc_coords))
+        dlon = GEOSCHEM['lon'][1] - GEOSCHEM['lon'][0]
+        dlat = GEOSCHEM['lat'][1] - GEOSCHEM['lat'][0]
         # Polygon representing TROPOMI pixel
-        p0 = Polygon(np.column_stack((longitude_bounds,latitude_bounds)))
+        polygon_tropomi = Polygon(np.column_stack((longitude_bounds,latitude_bounds)))
         # For each GEOS-Chem grid cell that touches the TROPOMI pixel: 
-        for iGridCell in range(len(GC_coords)):
+        for gridcellIndex in range(len(gc_coords)):
             # Define polygon representing the GEOS-Chem grid cell
-            item = GC_coords[iGridCell]
-            ap1 = [item[0]-dlon/2, item[0]+dlon/2, item[0]+dlon/2, item[0]-dlon/2]
-            ap2 = [item[1]-dlat/2, item[1]-dlat/2, item[1]+dlat/2, item[1]+dlat/2]        
-            p2 = Polygon(np.column_stack((ap1, ap2)))
+            coords = gc_coords[gridcellIndex]
+            geoschem_corners_lon = [coords[0]-dlon/2, coords[0]+dlon/2, coords[0]+dlon/2, coords[0]-dlon/2]
+            geoschem_corners_lat = [coords[1]-dlat/2, coords[1]-dlat/2, coords[1]+dlat/2, coords[1]+dlat/2]
+            polygon_geoschem = Polygon(np.column_stack((geoschem_corners_lon, geoschem_corners_lat)))
             # Calculate overlapping area as the intersection of the two polygons
-            if p2.intersects(p0):
-                  overlap_area[iGridCell] = p0.intersection(p2).area
+            if polygon_geoschem.intersects(polygon_tropomi):
+                  overlap_area[gridcellIndex] = polygon_tropomi.intersection(polygon_geoschem).area
         
         # If there is no overlap between GEOS-Chem and TROPOMI, skip to next observation:
         if sum(overlap_area) == 0:
@@ -514,56 +514,56 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
         area_weighted_virtual_tropomi_sensitivity = 0   # virtual tropomi sensitivity
         
         # For each GEOS-Chem grid cell that touches the TROPOMI pixel: 
-        for iGridCell in range(len(GC_coords)):
+        for gridcellIndex in range(len(gc_coords)):
             
             # Get GEOS-Chem lat/lon indices for the cell
-            iGC,jGC = GC_ij[iGridCell]
+            iGC,jGC = ij_GC[gridcellIndex]
             
             # Get GEOS-Chem pressure edges for the cell
-            p_gc = GC['PEDGE'][iGC,jGC,:]
+            p_gc = GEOSCHEM['PEDGE'][iGC,jGC,:]
             
             # Get GEOS-Chem methane for the cell
             if correct_strato:
-                GC_CH4 = GC['CH4_adjusted'][iGC,jGC,:]
+                gc_CH4 = GEOSCHEM['CH4_adjusted'][iGC,jGC,:]
             else:
-                GC_CH4 = GC['CH4'][iGC,jGC,:]
+                gc_CH4 = GEOSCHEM['CH4'][iGC,jGC,:]
                 
             # Get merged GEOS-Chem/TROPOMI pressure grid for the cell
             merged = merge_pressure_grids(p_sat, p_gc)
             
             # Remap GEOS-Chem methane to TROPOMI pressure levels
-            sat_CH4 = remap(GC_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
+            sat_CH4 = remap(gc_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
             
             # Convert ppb to mol m-2
             sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
-            virtual_tropomi_iGridCell = sum(apriori + AK * (sat_CH4_molm2 - apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
+            virtual_tropomi_gridcellIndex = sum(apriori + avkern * (sat_CH4_molm2 - apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             
             # Weight by overlapping area (to be divided out later) and add to sum
-            area_weighted_virtual_tropomi += overlap_area[iGridCell] * virtual_tropomi_iGridCell  # ppb m2
+            area_weighted_virtual_tropomi += overlap_area[gridcellIndex] * virtual_tropomi_gridcellIndex  # ppb m2
 
             # If building Jacobian matrix from GEOS-Chem perturbation simulation sensitivity data:
             if build_jacobian:
                 
                 # Get GEOS-Chem perturbation sensitivities at this lat/lon, for all vertical levels and state vector elements
-                sens_lonlat = GC['Sensitivities'][iGC,jGC,:,:]
+                sens_lonlat = GEOSCHEM['Sensitivities'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
                 sat_deltaCH4 = remap_sensitivities(sens_lonlat, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])  # mixing ratio, unitless
                 
                 # Tile the TROPOMI averaging kernel
-                AK_tiled = np.transpose(np.tile(AK, (n_elements,1)))
+                avkern_tiled = np.transpose(np.tile(avkern, (n_elements,1)))
                 
                 # Tile the TROPOMI dry air subcolumns
                 dry_air_subcolumns_tiled = np.transpose(np.tile(dry_air_subcolumns, (n_elements,1)))   # mol m-2
                 
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
-                tropomi_sensitivity_iGridCell = np.sum(AK_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
+                tropomi_sensitivity_gridcellIndex = np.sum(avkern_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
                 
                 # Weight by overlapping area (to be divided out later) and add to sum
-                area_weighted_virtual_tropomi_sensitivity += overlap_area[iGridCell] * tropomi_sensitivity_iGridCell  # m2
+                area_weighted_virtual_tropomi_sensitivity += overlap_area[gridcellIndex] * tropomi_sensitivity_gridcellIndex  # m2
 
         # Compute virtual TROPOMI observation as weighted mean by overlapping area
         # i.e., need to divide out area [m2] from the previous step
