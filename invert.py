@@ -53,22 +53,31 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     files.sort()
 
     # ==========================================================================================
-    # Now we will assemble different terms of the analytical inversion.
+    # Now we will assemble two different expressions needed for the analytical inversion.
     #
-    # These are the terms of eq. (5) and (6) in Zhang et al. (2018) ACP:
+    # These expressions are from eq. (5) and (6) in Zhang et al. (2018) ACP:
     # "Monitoring global OH concentrations using satellite observations of atmospheric methane".
     #
     # Specifically, we are going to solve:
     #   xhat = xA + G*(y-K*xA) 
-    #        = xA + inv(gamma*K^T*inv(S_o)*K + inv(S_a)) * gamma*K^T*inv(S_o) * (y-K*xA)
+    #        = xA + inv(gamma * K^T*inv(S_o)*K + inv(S_a)) * gamma * K^T*inv(S_o) * (y-K*xA)
+    #                          (--------------)                     (-----------------------)
+    #                            Expression 1                             Expression 2
+    #
+    # Expression 1 = "KTinvSoK"
+    # Expression 2 = "KTinvSoyKxA"
     #
     # In the code below this becomes
     #   xhat = xA + inv(gamma*KTinvSoK + inv(S_a)) * gamma*KTinvSoyKxA
     #        = xA + ratio
     #        = 1  + ratio      [since xA=1 when optimizing scale factors]
+    #
+    # We build KTinvSoK and KTinvSoyKxA "piece by piece", loading one jacobian .pkl file at a
+    # time. This is so that we don't need to assemble or invert the full Jacobian matrix, which 
+    # can be very large.
     # ==========================================================================================
 
-    # Initialize two expressions in the inversion equation
+    # Initialize two expressions from the inversion equation
     KTinvSoK = np.zeros([n_elements,n_elements], dtype=float) # expression 1: K^T * inv(S_o) * K
     KTinvSoyKxA = np.zeros([n_elements], dtype=float)         # expression 2: K^T * inv(S_o) * (y-K*xA)
 
@@ -110,7 +119,7 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
         obs_error.fill(obs_err**2)
     
         # Measurement-model mismatch: TROPOMI columns minus GEOS-Chem virtual TROPOMI columns
-        # This is (y - F(xA)), or (y - (K*xA + c)), or (y - K*xA) in shorthand
+        # This is (y - F(xA)), i.e., (y - (K*xA + c)) or (y - K*xA) in shorthand
         delta_y = obs_GC[:,0] - obs_GC[:,1] # [ppb]
         
         # If there are any nans in the data, abort 
