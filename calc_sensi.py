@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import datetime
 from joblib import Parallel, delayed
+from utils import zero_pad_num_hour
 
 
 def zero_pad_num(n):
@@ -11,13 +12,6 @@ def zero_pad_num(n):
     if len(nstr) == 2:
         nstr = '00'+nstr
     if len(nstr) == 3:
-        nstr = '0'+nstr
-    return nstr
-
-
-def zero_pad_num_hour(n):
-    nstr = str(n)
-    if len(nstr) == 1:
         nstr = '0'+nstr
     return nstr
 

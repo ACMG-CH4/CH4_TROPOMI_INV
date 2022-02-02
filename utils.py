@@ -22,6 +22,14 @@ def load_obj(name):
     with open(name, 'rb') as f:
         return pickle.load(f)
 
+
+def zero_pad_num_hour(n):
+    nstr = str(n)
+    if len(nstr) == 1:
+        nstr = '0'+nstr
+    return nstr
+
+
 def calculate_gridcell_areas(state_vector, mask, dlat, dlon):
     '''
     Compute the surface areas of grid cells in the region of interest, in m2.
