@@ -17,13 +17,6 @@ from utils import save_obj
 # ======
 # - The lat_ratio.csv file used for stratospheric correction is manually defined.
 #   We may want to remove this feature entirely.
-# - We compute virtual TROPOMI column from GEOS-Chem data using the TROPOMI prior
-#   and averaging kernel, as the weighted mean mixing ratio [ppb] over the column
-#   in relevant GEOS-Chem ground cell(s). Zhen Qu does it as the weighted mean of
-#   the number of molecules instead. This requires saving out an additional GEOS-Chem 
-#   diagnostic variable -- something like the mass column in addition to PEDGE.
-# - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
-#   virtual TROPOMI column [ppb] in apply_tropomi_operator().
 
     
 def read_tropomi(filename):
