@@ -619,7 +619,7 @@ if __name__ == '__main__':
     latmin = float(sys.argv[5])
     latmax = float(sys.argv[6])
     n_elements = int(sys.argv[7])
-    Sat_datadir = sys.argv[8]
+    tropomi_cache = sys.argv[8]
     isPost = sys.argv[9]
  
     # Reformat start and end days for datetime in configuration
@@ -646,7 +646,7 @@ if __name__ == '__main__':
     print('End:', end)
     
     # Get TROPOMI data filenames for the desired date range
-    allfiles = glob.glob(f'{Sat_datadir}/*.nc')
+    allfiles = glob.glob(f'{tropomi_cache}/*.nc')
     sat_files = []
     for index in range(len(allfiles)):
         filename = allfiles[index]
