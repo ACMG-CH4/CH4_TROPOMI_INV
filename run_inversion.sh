@@ -108,9 +108,9 @@ printf "DONE -- calc_sensi.py\n\n"
 #=======================================================================
 GCsourcepth="${JacobianRunsDir}/${RunName}_0000/OutputDir"
 
-printf "Calling setup_GCdatadir.py\n"
-python setup_GCdatadir.py $StartDate $EndDate $GCsourcepth $GCDir; wait
-printf "DONE -- setup_GCdatadir.py\n\n"
+printf "Calling setup_gc_cache.py\n"
+python setup_gc_cache.py $StartDate $EndDate $GCsourcepth $GCDir; wait
+printf "DONE -- setup_gc_cache.py\n\n"
 
 #=======================================================================
 # Generate Jacobian matrix files 
