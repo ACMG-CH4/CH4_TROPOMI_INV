@@ -187,8 +187,7 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
     if build_jacobian:
-        filename = f'{sens_cache}/Sensi_{date}.nc'
-        sensitivity_data = xr.open_dataset(filename)
+        sensitivity_data = xr.open_dataset(f'{sens_cache}/Sensi_{date}.nc')
         sensitivities = sensitivity_data['Sensitivities'].values
         # Reshape so the data have dimensions (lon, lat, lev, grid_element)
         sensitivities = np.einsum('klji->ijlk', sensitivities)
