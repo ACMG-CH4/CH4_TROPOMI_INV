@@ -11,6 +11,7 @@ import os
 import pandas as pd 
 import datetime
 from shapely.geometry import Polygon
+from utils import save_obj
 
 # Notes:
 # ======
@@ -23,19 +24,6 @@ from shapely.geometry import Polygon
 #   diagnostic variable -- something like the mass column in addition to PEDGE.
 # - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
 #   virtual TROPOMI column [ppb] in apply_tropomi_operator().
-
-def save_obj(obj, name):
-    """ Save something with Pickle. """
-    
-    with open(name , 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-
-def load_obj(name):
-    """ Load something with Pickle. """
-
-    with open( name, 'rb') as f:
-        return pickle.load(f)
 
     
 def read_tropomi(filename):

@@ -5,19 +5,7 @@ import numpy as np
 from netCDF4 import Dataset
 import xarray as xr
 import pickle
-
-def save_obj(obj, name ):
-    """ Save something with Pickle. """
-
-    with open(name , 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-
-def load_obj(name):
-    """ Load something with Pickle. """
-
-    with open(name, 'rb') as f:
-        return pickle.load(f)
+from utils import load_obj
 
 
 def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, prior_err=0.5, obs_err=15, gamma=0.25, res='0.25x0.3125'):
@@ -123,10 +111,10 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
     
         # Measurement-model mismatch: TROPOMI columns minus GEOS-Chem virtual TROPOMI columns
         # This is (y - F(xA)), or (y - (K*xA + c)), or (y - K*xA) in shorthand
-        deltaY = obs_GC[:,0] - obs_GC[:,1] # [ppb]
+        delta_y = obs_GC[:,0] - obs_GC[:,1] # [ppb]
         
         # If there are any nans in the data, abort 
-        if (np.any(np.isnan(deltaY)) or np.any(np.isnan(K)) or np.any(np.isnan(obs_error))):
+        if (np.any(np.isnan(delta_y)) or np.any(np.isnan(K)) or np.any(np.isnan(obs_error))):
             print('missing values', fi)
             break
     
@@ -138,16 +126,16 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
 
         # Parts of inversion equation
         partial_KTinvSoK = KTinvSo@K             # expression 1: K^T * inv(S_o) * K
-        partial_KTinvSoyKxA = KTinvSo@deltaY     # expression 2: K^T * inv(S_o) * (y-K*xA)
+        partial_KTinvSoyKxA = KTinvSo@delta_y    # expression 2: K^T * inv(S_o) * (y-K*xA)
    
         # Add partial expressions to sums 
         KTinvSoK += partial_KTinvSoK
         KTinvSoyKxA += partial_KTinvSoyKxA
         
     # Inverse of prior error covariance matrix, inv(S_a)
-    emis_error = np.zeros(n_elements)
-    emis_error.fill(prior_err**2)    
-    inv_Sa = np.diag(1/emis_error)   # Inverse of prior error covariance matrix
+    Sa_diag = np.zeros(n_elements)
+    Sa_diag.fill(prior_err**2)    
+    inv_Sa = np.diag(1/Sa_diag)   # Inverse of prior error covariance matrix
 
     # Solve for posterior scale factors xhat
     ratio = np.linalg.inv(gamma*KTinvSoK + inv_Sa)@(gamma*KTinvSoyKxA)

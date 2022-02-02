@@ -6,6 +6,21 @@ from shapely.geometry.polygon import Polygon
 import shapely.ops as ops
 import cartopy
 import cartopy.crs as ccrs
+import pickle
+
+
+def save_obj(obj, name ):
+    ''' Save something with Pickle. '''
+
+    with open(name , 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_obj(name):
+    ''' Load something with Pickle. '''
+
+    with open(name, 'rb') as f:
+        return pickle.load(f)
 
 def calculate_gridcell_areas(state_vector, mask, dlat, dlon):
     '''

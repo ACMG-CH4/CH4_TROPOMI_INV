@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 from sklearn.cluster import KMeans
 
+
 def get_nested_grid_bounds(land_cover_pth):
     '''
     Get the lat/lon bounds of the nested grid window (NA, EU, AS) for the inversion.
@@ -164,6 +165,7 @@ def make_state_vector_file(land_cover_pth, save_pth, lat_min, lat_max, lon_min, 
         ds_statevector.to_netcdf(save_pth)
     
     return ds_statevector
+
 
 if __name__ == '__main__':
     import sys

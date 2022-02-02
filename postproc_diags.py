@@ -64,6 +64,7 @@ def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
 
     results = Parallel(n_jobs=-1)(delayed(process)(run) for run in rundirs)
 
+
 def fill_missing_hour_posterior(run_dirs_pth, prev_run_pth, start_day):
     # Load hour zero from end of spinup run or previous posterior simulation
     prev_file_SC = f'{prev_run_pth}/OutputDir/GEOSChem.SpeciesConc.{start_day}_0000z.nc4'

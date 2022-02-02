@@ -15,6 +15,7 @@ from jacobian import read_tropomi
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+
 def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     '''
     Function to perform preview

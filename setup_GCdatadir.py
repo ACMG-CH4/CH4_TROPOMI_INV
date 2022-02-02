@@ -2,11 +2,13 @@ import xarray as xr
 import datetime
 from joblib import Parallel, delayed
 
+
 def zero_pad_num_hour(n):
     nstr = str(n)
     if len(nstr) == 1:
         nstr = '0'+nstr
     return nstr
+
 
 def setup_GCdatadir(startday, endday, GC_source_pth, GC_destination_pth):
     '''

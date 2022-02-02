@@ -14,11 +14,13 @@ def zero_pad_num(n):
         nstr = '0'+nstr
     return nstr
 
+
 def zero_pad_num_hour(n):
     nstr = str(n)
     if len(nstr) == 1:
         nstr = '0'+nstr
     return nstr
+
 
 def calc_sensi(nelements, perturbation, startday, endday, run_dirs_pth, run_name, sensi_save_pth):
     '''

@@ -3,6 +3,7 @@ import xarray as xr
 import os
 import numpy as np
 
+
 def do_gridding(vector, statevector):
     '''
     Project input vector on the inversion grid using information from the state vector file.
@@ -80,6 +81,7 @@ def make_gridded_posterior(posterior_SF_path, state_vector_path, save_path):
     ds.to_netcdf(save_path)
 
     print(f'Saved gridded file to {save_path}')
+
 
 if __name__ == '__main__':
     import sys
