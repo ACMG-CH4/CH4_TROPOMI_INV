@@ -20,7 +20,7 @@ from utils import save_obj
 # - We compute virtual TROPOMI column from GEOS-Chem data using the TROPOMI prior
 #   and averaging kernel, as the weighted mean mixing ratio [ppb] over the column
 #   in relevant GEOS-Chem ground cell(s). Zhen Qu does it as the weighted mean of
-#   the number of molecules instead. This requires saving out an additional GC 
+#   the number of molecules instead. This requires saving out an additional GEOS-Chem 
 #   diagnostic variable -- something like the mass column in addition to PEDGE.
 # - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
 #   virtual TROPOMI column [ppb] in apply_tropomi_operator().
@@ -118,18 +118,18 @@ def read_tropomi(filename):
     return dat
 
 
-def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
 
     Arguments
         date           [str]   : Date of interest
-        GC_datadir     [str]   : Path to GC output data
+        gc_cache       [str]   : Path to GEOS-Chem output data
         build_jacobian [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        sens_cache     [str]   : If build_jacobian=True, this is the path to the GC sensitivity data
+        sens_cache     [str]   : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
         correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
         lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+        lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
     
     Returns
         dat            [dict]  : Dictionary of important variables from GEOS-Chem:
@@ -141,14 +141,14 @@ def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_str
                                     - CH4_adjusted, if correct_strato=True
     """
     
-    # Assemble file paths to GC output collections for input data
+    # Assemble file paths to GEOS-Chem output collections for input data
     month = int(date[4:6])
     file_species = f'GEOSChem.SpeciesConc.{date}00z.nc4'        
     file_pedge = f'GEOSChem.LevelEdgeDiags.{date}00z.nc4'    
     file_troppause = f'GEOSChem.StateMet.{date}00z.nc4'    
     
     # Read lat, lon, CH4 from the SpeciecConc collection
-    filename = f'{GC_datadir}/{file_species}'
+    filename = f'{gc_cache}/{file_species}'
     gc_data = xr.open_dataset(filename)
     LON = gc_data['lon'].values
     LAT = gc_data['lat'].values
@@ -158,7 +158,7 @@ def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_str
     gc_data.close()
 
     # Read PEDGE from the LevelEdgeDiags collection
-    filename = f'{GC_datadir}/{file_pedge}'
+    filename = f'{gc_cache}/{file_pedge}'
     gc_data = xr.open_dataset(filename)
     PEDGE = gc_data['Met_PEDGE'].values[0,:,:,:]
     PEDGE = np.einsum('lij->jil', PEDGE)
@@ -168,7 +168,7 @@ def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_str
     if correct_strato:
         
         # Read tropopause level from StateMet collection
-        filename = f'{GC_datadir}/{file_troppause}'
+        filename = f'{gc_cache}/{file_troppause}'
         gc_data = xr.open_dataset(filename)
         TROPP = gc_data['Met_TropLev'].values[0,:,:]
         TROPP = np.einsum('ij->ji', TROPP)
@@ -182,7 +182,7 @@ def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_str
                 ind = np.where(lat_mid == LAT[j])[0][0]
                 CH4_adjusted[i,j,l:] = CH4[i,j,l:]*lat_ratio[ind,month-1]
     
-    # Store GC data in dictionary
+    # Store GEOS-Chem data in dictionary
     dat = {}
     dat['lon'] = LON
     dat['lat'] = LAT
@@ -205,26 +205,26 @@ def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_str
     return dat
 
 
-def read_all_GC(all_strdate, GC_datadir, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_all_geoschem(all_strdate, gc_cache, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """ 
-    Call read_GC() for multiple dates in a loop. 
+    Call readgeoschem() for multiple dates in a loop. 
 
     Arguments
         all_strdate    [list, str] : Multiple date strings
-        GC_datadir     [str]       : Path to GC output data
+        gc_cache       [str]       : Path to GEOS-Chem output data
         build_jacobian [log]       : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        sens_cache     [str]       : If build_jacobian=True, this is the path to the GC sensitivity data
+        sens_cache     [str]       : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
         correct_strato [log]       : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
         lat_mid        [float]     : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float]     : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+        lat_ratio      [float]     : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
 
     Returns
-        dat            [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_GC()
+        dat            [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_geoschem()
     """
 
     dat={}
     for strdate in all_strdate:
-        dat[strdate] = read_GC(strdate, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio) 
+        dat[strdate] = read_geoschem(strdate, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio) 
     
     return dat
 
@@ -240,7 +240,7 @@ def merge_pressure_grids(p_sat, p_gc):
     Returns
         merged  [dict]     : Merged grid dictionary
                                 - p_merge       : merged pressure-edge grid 
-                                - data_type     : for each pressure edge in the merged grid, is it from GC or TROPOMI?
+                                - data_type     : for each pressure edge in the merged grid, is it from GEOS-Chem or TROPOMI?
                                 - edge_index    : indexes of pressure edges
                                 - first_gc_edge : index of first GEOS-Chem pressure edge in the merged grid
     """
@@ -303,7 +303,7 @@ def remap(gc_CH4, data_type, p_merge, edge_index, first_gc_edge):
         first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
+        sat_CH4       [float]   : GEOS-Chem methane in TROPOMI pressure coordinates
     """
     
     # Define CH4 concentrations in the layers of the merged pressure grid
@@ -336,14 +336,14 @@ def remap_sensitivities(sens_lonlat, data_type, p_merge, edge_index, first_gc_ed
     Remap GEOS-Chem sensitivity data (from perturbation simulations) to the TROPOMI vertical grid.
 
     Arguments
-        sens_lonlat   [float]   : Sensitivity data from GC perturbation runs, for a specific lon/lat; has dims (lev, grid_element)
+        sens_lonlat   [float]   : Sensitivity data from GEOS-Chem perturbation runs, for a specific lon/lat; has dims (lev, grid_element)
         p_merge       [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
         data_type     [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from merge_pressure_grids()
         edge_index    [int]     : Indexes of pressure edges, from merge_pressure_grids()
         first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        sat_deltaCH4  [float]   : GC methane sensitivities in TROPOMI pressure coordinates
+        sat_deltaCH4  [float]   : GEOS-Chem methane sensitivities in TROPOMI pressure coordinates
     """
     
     # Define DeltaCH4 in the layers of the merged pressure grid, for all perturbed state vector elements
@@ -384,29 +384,29 @@ def nearest_loc(query_location, reference_grid, tolerance=0.5):
         return ind
 
 
-def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache, correct_strato=False, lat_mid=None, lat_ratio=None):
+def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Apply the tropomi operator to map GEOS-Chem methane data to TROPOMI observation space.
 
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
         n_elements     [int]        : Number of state vector elements
-        GC_startdate   [datetime64] : First day of inversion period, for GC and TROPOMI
-        GC_enddate     [datetime64] : Last day of inversion period, for GC and TROPOMI
+        gc_startdate   [datetime64] : First day of inversion period, for GEOS-Chem and TROPOMI
+        gc_enddate     [datetime64] : Last day of inversion period, for GEOS-Chem and TROPOMI
         xlim           [float]      : Longitude bounds for simulation domain
         ylim           [float]      : Latitude bounds for simulation domain
-        GC_datadir     [str]        : Path to GC output data
+        gc_cache       [str]        : Path to GEOS-Chem output data
         build_jacobian [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        sens_cache     [str]        : If build_jacobian=True, this is the path to the GC sensitivity data
+        sens_cache     [str]        : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
         correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
         lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
+        lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
 
     Returns
         output         [dict]       : Dictionary with one or two fields:
  	   	 		                        - obs_GC : GEOS-Chem and TROPOMI methane data
                                                     - TROPOMI methane
-                                                    - GC methane
+                                                    - GEOS-Chem methane
                                                     - TROPOMI lat, lon
                                                     - TROPOMI lat index, lon index
 				                      If build_jacobian=True, also include:
@@ -419,7 +419,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
     # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
     sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
-                       (TROPOMI['time'] >= GC_startdate)      & (TROPOMI['time'] <= GC_enddate)       &
+                       (TROPOMI['time'] >= gc_startdate)      & (TROPOMI['time'] <= gc_enddate)       &
                        (TROPOMI['qa_value']  >= 0.5)          &
                        (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
 
@@ -427,7 +427,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
     n_obs = len(sat_ind[0])
     print('Found', n_obs, 'TROPOMI observations.')
 
-    # If need to build Jacobian from GC perturbation simulation sensitivity data:
+    # If need to build Jacobian from GEOS-Chem perturbation simulation sensitivity data:
     if build_jacobian:
         # Initialize Jacobian K
         jacobian_K = np.zeros([n_obs,n_elements], dtype=np.float32)
@@ -447,16 +447,16 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
     all_strdate = list(set(all_strdate))
 
     # Read GEOS_Chem data for the dates of interest
-    all_date_GC = read_all_GC(all_strdate, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
+    all_date_gc = read_all_geoschem(all_strdate, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
     
-    # Initialize array with n_obs rows and 6 columns. Columns are TROPOMI-CH4, GC-CH4, longitude, latitude, II, JJ
+    # Initialize array with n_obs rows and 6 columns. Columns are TROPOMI CH4, GEOSChem CH4, longitude, latitude, II, JJ
     obs_GC = np.zeros([n_obs,6], dtype=np.float32)
     obs_GC.fill(np.nan)
 
     # For each TROPOMI observation: 
     for k in range(n_obs):
         
-        # Get GC data for the date of the observation:
+        # Get GEOS-Chem data for the date of the observation:
         iSat = sat_ind[0][k]
         jSat = sat_ind[1][k]
         p_sat = TROPOMI['pressures'][iSat,jSat,:]
@@ -465,9 +465,9 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
         AK = TROPOMI['column_AK'][iSat,jSat,:]
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
-        GC = all_date_GC[strdate]
+        GC = all_date_gc[strdate]
                 
-        # Find GC lats & lons closest to the corners of the TROPOMI pixel
+        # Find GEOS-Chem lats & lons closest to the corners of the TROPOMI pixel
         longitude_bounds = TROPOMI['longitude_bounds'][iSat,jSat,:]
         latitude_bounds = TROPOMI['latitude_bounds'][iSat,jSat,:]
         corners_lon = []
@@ -480,19 +480,19 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
         # If the tolerance in nearest_loc() is not satisfied, skip the observation 
         if np.nan in corners_lon+corners_lat:
             continue
-        # Get lat/lon indexes and coordinates of GC grid cells closest to the TROPOMI corners
+        # Get lat/lon indexes and coordinates of GEOS-Chem grid cells closest to the TROPOMI corners
         GC_ij = [(x,y) for x in set(corners_lon) for y in set(corners_lat)]
         GC_coords = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
         
-        # Compute the overlapping area between the TROPOMI pixel and GC grid cells it touches
+        # Compute the overlapping area between the TROPOMI pixel and GEOS-Chem grid cells it touches
         overlap_area = np.zeros(len(GC_coords))
         dlon = GC['lon'][1]-GC['lon'][0]
         dlat = GC['lat'][1]-GC['lat'][0]
         # Polygon representing TROPOMI pixel
         p0 = Polygon(np.column_stack((longitude_bounds,latitude_bounds)))
-        # For each GC grid cell that touches the TROPOMI pixel: 
+        # For each GEOS-Chem grid cell that touches the TROPOMI pixel: 
         for iGridCell in range(len(GC_coords)):
-            # Define polygon representing the GC grid cell
+            # Define polygon representing the GEOS-Chem grid cell
             item = GC_coords[iGridCell]
             ap1 = [item[0]-dlon/2, item[0]+dlon/2, item[0]+dlon/2, item[0]-dlon/2]
             ap2 = [item[1]-dlat/2, item[1]-dlat/2, item[1]+dlat/2, item[1]+dlat/2]        
@@ -501,7 +501,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
             if p2.intersects(p0):
                   overlap_area[iGridCell] = p0.intersection(p2).area
         
-        # If there is no overlap between GC and TROPOMI, skip to next observation:
+        # If there is no overlap between GEOS-Chem and TROPOMI, skip to next observation:
         if sum(overlap_area) == 0:
             continue                  
 
@@ -513,16 +513,16 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
         area_weighted_virtual_tropomi = 0       # virtual tropomi xch4
         area_weighted_virtual_tropomi_sensitivity = 0   # virtual tropomi sensitivity
         
-        # For each GC grid cell that touches the TROPOMI pixel: 
+        # For each GEOS-Chem grid cell that touches the TROPOMI pixel: 
         for iGridCell in range(len(GC_coords)):
             
-            # Get GC lat/lon indices for the cell
+            # Get GEOS-Chem lat/lon indices for the cell
             iGC,jGC = GC_ij[iGridCell]
             
-            # Get GC pressure edges for the cell
+            # Get GEOS-Chem pressure edges for the cell
             p_gc = GC['PEDGE'][iGC,jGC,:]
             
-            # Get GC methane for the cell
+            # Get GEOS-Chem methane for the cell
             if correct_strato:
                 GC_CH4 = GC['CH4_adjusted'][iGC,jGC,:]
             else:
@@ -531,7 +531,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
             # Get merged GEOS-Chem/TROPOMI pressure grid for the cell
             merged = merge_pressure_grids(p_sat, p_gc)
             
-            # Remap GC methane to TROPOMI pressure levels
+            # Remap GEOS-Chem methane to TROPOMI pressure levels
             sat_CH4 = remap(GC_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
             
             # Convert ppb to mol m-2
@@ -544,10 +544,10 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
             # Weight by overlapping area (to be divided out later) and add to sum
             area_weighted_virtual_tropomi += overlap_area[iGridCell] * virtual_tropomi_iGridCell  # ppb m2
 
-            # If building Jacobian matrix from GC perturbation simulation sensitivity data:
+            # If building Jacobian matrix from GEOS-Chem perturbation simulation sensitivity data:
             if build_jacobian:
                 
-                # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and state vector elements
+                # Get GEOS-Chem perturbation sensitivities at this lat/lon, for all vertical levels and state vector elements
                 sens_lonlat = GC['Sensitivities'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
@@ -585,7 +585,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
     # Output 
     output = {}
 
-    # Always return the coincident TROPOMI and GC data
+    # Always return the coincident TROPOMI and GEOS-Chem data
     output['obs_GC'] = obs_GC
 
     # Optionally return the Jacobian
@@ -620,16 +620,16 @@ if __name__ == '__main__':
     sens_cache = f'{workdir}/Sensi'
     if isPost.lower() == 'false':
         build_jacobian = True
-        GC_datadir = f'{workdir}/data_GC'
+        gc_cache = f'{workdir}/data_GC'
         outputdir = f'{workdir}/data_converted'
     else: # if sampling posterior simulation
         build_jacobian = False
-        GC_datadir = f'{workdir}/data_GC_posterior'
+        gc_cache = f'{workdir}/data_GC_posterior'
         outputdir = f'{workdir}/data_converted_posterior'
     xlim = [lonmin,lonmax]
     ylim = [latmin,latmax]
-    GC_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
-    GC_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
+    gc_startdate = np.datetime64(datetime.datetime.strptime(start, '%Y-%m-%d %H:%M:%S'))
+    gc_enddate = np.datetime64(datetime.datetime.strptime(end, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(days=1))
     print('Start:', start)
     print('End:', end)
     
@@ -642,7 +642,7 @@ if __name__ == '__main__':
         shortname = re.split('\.', shortname)[0]
         strdate = re.split('\.|_+|T',shortname)[4]
         strdate2 = datetime.datetime.strptime(strdate, '%Y%m%d')
-        if ((strdate2 >= GC_startdate) and (strdate2 <= GC_enddate)):
+        if ((strdate2 >= gc_startdate) and (strdate2 <= gc_enddate)):
             sat_files.append(filename)
     sat_files.sort()
     print('Found', len(sat_files), 'TROPOMI data files.')
@@ -663,10 +663,10 @@ if __name__ == '__main__':
                 df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
                 lat_ratio = df.values
-                output = apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
+                output = apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
             else:
                 print('Applying TROPOMI operator...')
-                output = apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache)
+                output = apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache)
         if output['obs_GC'].shape[0] > 0:
             print('Saving .pkl file')
             save_obj(output, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
