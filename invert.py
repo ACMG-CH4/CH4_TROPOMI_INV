@@ -111,7 +111,7 @@ def do_inversion(n_elements, jacobian_dir, lon_min, lon_max, lat_min, lat_max, p
         obs_GC = obs_GC[ind,:]
 
         # Jacobian entries for observations within bounds [ppb]
-        K = 1e9 * dat['KK'][ind,:]
+        K = 1e9 * dat['K'][ind,:]
 
         # Number of observations
         N = obs_GC.shape[0]
