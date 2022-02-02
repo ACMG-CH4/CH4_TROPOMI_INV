@@ -134,7 +134,7 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None):
     LON = gc_data['lon'].values
     LAT = gc_data['lat'].values
     CH4 = gc_data['SpeciesConc_CH4'].values[0,:,:,:]
-    CH4 = CH4*1e9                                    # Convert to ppb
+    CH4 = CH4*1e9 # Convert to ppb
     CH4 = np.einsum('lij->jil', CH4)
     gc_data.close()
 
@@ -413,8 +413,8 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
         iSat = sat_ind[0][k]
         jSat = sat_ind[1][k]
         p_sat = TROPOMI['pressures'][iSat,jSat,:]
-        dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
-        apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]             # mol m-2
+        dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:] # mol m-2
+        apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]       # mol m-2
         avkern = TROPOMI['column_AK'][iSat,jSat,:]
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
@@ -463,8 +463,8 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
         # =======================================================
         
         # Otherwise, initialize tropomi virtual xch4 and virtual sensitivity as zero
-        area_weighted_virtual_tropomi = 0       # virtual tropomi xch4
-        area_weighted_virtual_tropomi_sensitivity = 0   # virtual tropomi sensitivity
+        area_weighted_virtual_tropomi = 0             # virtual tropomi xch4
+        area_weighted_virtual_tropomi_sensitivity = 0 # virtual tropomi sensitivity
         
         # For each GEOS-Chem grid cell that touches the TROPOMI pixel: 
         for gridcellIndex in range(len(gc_coords)):
@@ -482,17 +482,17 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
             merged = merge_pressure_grids(p_sat, p_gc)
             
             # Remap GEOS-Chem methane to TROPOMI pressure levels
-            sat_CH4 = remap(gc_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
+            sat_CH4 = remap(gc_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge']) # ppb
             
             # Convert ppb to mol m-2
             sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
-            virtual_tropomi_gridcellIndex = sum(apriori + avkern * (sat_CH4_molm2 - apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
+            virtual_tropomi_gridcellIndex = sum(apriori + avkern * (sat_CH4_molm2 - apriori)) / sum(dry_air_subcolumns) * 1e9 # ppb
             
             # Weight by overlapping area (to be divided out later) and add to sum
-            area_weighted_virtual_tropomi += overlap_area[gridcellIndex] * virtual_tropomi_gridcellIndex  # ppb m2
+            area_weighted_virtual_tropomi += overlap_area[gridcellIndex] * virtual_tropomi_gridcellIndex # ppb m2
 
             # If building Jacobian matrix from GEOS-Chem perturbation simulation sensitivity data:
             if build_jacobian:
@@ -501,7 +501,7 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
                 sens_lonlat = GEOSCHEM['Sensitivities'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
-                sat_deltaCH4 = remap_sensitivities(sens_lonlat, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])  # mixing ratio, unitless
+                sat_deltaCH4 = remap_sensitivities(sens_lonlat, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge']) # mixing ratio, unitless
                 
                 # Tile the TROPOMI averaging kernel
                 avkern_tiled = np.transpose(np.tile(avkern, (n_elements,1)))
@@ -510,10 +510,10 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
                 dry_air_subcolumns_tiled = np.transpose(np.tile(dry_air_subcolumns, (n_elements,1)))   # mol m-2
                 
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
-                tropomi_sensitivity_gridcellIndex = np.sum(avkern_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
+                tropomi_sensitivity_gridcellIndex = np.sum(avkern_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns) # mixing ratio, unitless
                 
                 # Weight by overlapping area (to be divided out later) and add to sum
-                area_weighted_virtual_tropomi_sensitivity += overlap_area[gridcellIndex] * tropomi_sensitivity_gridcellIndex  # m2
+                area_weighted_virtual_tropomi_sensitivity += overlap_area[gridcellIndex] * tropomi_sensitivity_gridcellIndex # m2
 
         # Compute virtual TROPOMI observation as weighted mean by overlapping area
         # i.e., need to divide out area [m2] from the previous step
