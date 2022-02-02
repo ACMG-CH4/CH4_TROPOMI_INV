@@ -511,7 +511,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
         
         # Otherwise, initialize tropomi virtual xch4 and virtual sensitivity as zero
         area_weighted_virtual_tropomi = 0       # virtual tropomi xch4
-        area_weighted_tropomi_sensitivity = 0   # virtual tropomi sensitivity
+        area_weighted_virtual_tropomi_sensitivity = 0   # virtual tropomi sensitivity
         
         # For each GC grid cell that touches the TROPOMI pixel: 
         for iGridCell in range(len(GC_coords)):
@@ -563,7 +563,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
                 tropomi_sensitivity_iGridCell = np.sum(AK_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
                 
                 # Weight by overlapping area (to be divided out later) and add to sum
-                area_weighted_tropomi_sensitivity += overlap_area[iGridCell] * tropomi_sensitivity_iGridCell  # m2
+                area_weighted_virtual_tropomi_sensitivity += overlap_area[iGridCell] * tropomi_sensitivity_iGridCell  # m2
 
         # Compute virtual TROPOMI observation as weighted mean by overlapping area
         # i.e., need to divide out area [m2] from the previous step
@@ -580,7 +580,7 @@ def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim,
         if build_jacobian:
             # Compute TROPOMI sensitivity as weighted mean by overlapping area
             # i.e., need to divide out area [m2] from the previous step
-            jacobian_K[k,:] = area_weighted_tropomi_sensitivity / sum(overlap_area)
+            jacobian_K[k,:] = area_weighted_virtual_tropomi_sensitivity / sum(overlap_area)
     
     # Output 
     output = {}
