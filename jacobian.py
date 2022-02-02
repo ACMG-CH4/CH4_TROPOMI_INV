@@ -13,11 +13,6 @@ import datetime
 from shapely.geometry import Polygon
 from utils import save_obj
 
-# Notes:
-# ======
-# - The lat_ratio.csv file used for stratospheric correction is manually defined.
-#   We may want to remove this feature entirely.
-
     
 def read_tropomi(filename):
     """
@@ -111,7 +106,7 @@ def read_tropomi(filename):
     return dat
 
 
-def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
 
@@ -120,9 +115,6 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct
         gc_cache       [str]   : Path to GEOS-Chem output data
         build_jacobian [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
         sens_cache     [str]   : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
-        correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
-        lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
     
     Returns
         dat            [dict]  : Dictionary of important variables from GEOS-Chem:
@@ -130,15 +122,11 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct
                                     - Latitude
                                     - Longitude
                                     - PEDGE
-                                    - TROPP, if correct_strato=True
-                                    - CH4_adjusted, if correct_strato=True
     """
     
     # Assemble file paths to GEOS-Chem output collections for input data
-    month = int(date[4:6])
     file_species = f'GEOSChem.SpeciesConc.{date}00z.nc4'        
     file_pedge = f'GEOSChem.LevelEdgeDiags.{date}00z.nc4'    
-    file_troppause = f'GEOSChem.StateMet.{date}00z.nc4'    
     
     # Read lat, lon, CH4 from the SpeciecConc collection
     filename = f'{gc_cache}/{file_species}'
@@ -157,33 +145,12 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct
     PEDGE = np.einsum('lij->jil', PEDGE)
     gc_data.close()
     
-    # If want to do latitudinal correction of stratospheric bias in GEOS-Chem:
-    if correct_strato:
-        
-        # Read tropopause level from StateMet collection
-        filename = f'{gc_cache}/{file_troppause}'
-        gc_data = xr.open_dataset(filename)
-        TROPP = gc_data['Met_TropLev'].values[0,:,:]
-        TROPP = np.einsum('ij->ji', TROPP)
-        gc_data.close()
-
-        CH4_adjusted = CH4.copy()
-        for i in range(len(LON)):
-            for j in range(len(LAT)):
-                l = int(TROPP[i,j])
-                # Find the location of lat in lat_mid
-                ind = np.where(lat_mid == LAT[j])[0][0]
-                CH4_adjusted[i,j,l:] = CH4[i,j,l:]*lat_ratio[ind,month-1]
-    
     # Store GEOS-Chem data in dictionary
     dat = {}
     dat['lon'] = LON
     dat['lat'] = LAT
     dat['PEDGE'] = PEDGE
     dat['CH4'] = CH4
-    if correct_strato:
-        dat['TROPP'] = TROPP
-        dat['CH4_adjusted'] = CH4_adjusted
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
     if build_jacobian:
@@ -197,7 +164,7 @@ def read_geoschem(date, gc_cache, build_jacobian=False, sens_cache=None, correct
     return dat
 
 
-def read_all_geoschem(all_strdate, gc_cache, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_all_geoschem(all_strdate, gc_cache, build_jacobian=False, sens_cache=None):
     """ 
     Call readgeoschem() for multiple dates in a loop. 
 
@@ -206,9 +173,6 @@ def read_all_geoschem(all_strdate, gc_cache, build_jacobian=False, sens_cache=No
         gc_cache       [str]       : Path to GEOS-Chem output data
         build_jacobian [log]       : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
         sens_cache     [str]       : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
-        correct_strato [log]       : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
-        lat_mid        [float]     : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float]     : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
 
     Returns
         dat            [dict]      : Dictionary of dictionaries. Each sub-dictionary is returned by read_geoschem()
@@ -216,7 +180,7 @@ def read_all_geoschem(all_strdate, gc_cache, build_jacobian=False, sens_cache=No
 
     dat={}
     for strdate in all_strdate:
-        dat[strdate] = read_geoschem(strdate, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio) 
+        dat[strdate] = read_geoschem(strdate, gc_cache, build_jacobian, sens_cache) 
     
     return dat
 
@@ -376,7 +340,7 @@ def nearest_loc(query_location, reference_grid, tolerance=0.5):
         return ind
 
 
-def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache, correct_strato=False, lat_mid=None, lat_ratio=None):
+def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache):
     """
     Apply the tropomi operator to map GEOS-Chem methane data to TROPOMI observation space.
 
@@ -390,9 +354,6 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
         gc_cache       [str]        : Path to GEOS-Chem output data
         build_jacobian [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
         sens_cache     [str]        : If build_jacobian=True, this is the path to the GEOS-Chem sensitivity data
-        correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
-        lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
-        lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GEOS-Chem stratospheric methane to match ACE-FTS
 
     Returns
         output         [dict]       : Dictionary with one or two fields:
@@ -439,7 +400,7 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
     all_strdate = list(set(all_strdate))
 
     # Read GEOS_Chem data for the dates of interest
-    all_date_gc = read_all_geoschem(all_strdate, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
+    all_date_gc = read_all_geoschem(all_strdate, gc_cache, build_jacobian, sens_cache)
     
     # Initialize array with n_obs rows and 6 columns. Columns are TROPOMI CH4, GEOSChem CH4, longitude, latitude, II, JJ
     obs_GC = np.zeros([n_obs,6], dtype=np.float32)
@@ -515,10 +476,7 @@ def apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim,
             p_gc = GEOSCHEM['PEDGE'][iGC,jGC,:]
             
             # Get GEOS-Chem methane for the cell
-            if correct_strato:
-                gc_CH4 = GEOSCHEM['CH4_adjusted'][iGC,jGC,:]
-            else:
-                gc_CH4 = GEOSCHEM['CH4'][iGC,jGC,:]
+            gc_CH4 = GEOSCHEM['CH4'][iGC,jGC,:]
                 
             # Get merged GEOS-Chem/TROPOMI pressure grid for the cell
             merged = merge_pressure_grids(p_sat, p_gc)
@@ -607,7 +565,6 @@ if __name__ == '__main__':
     end = f'{endday[0:4]}-{endday[4:6]}-{endday[6:8]} 23:59:59'
 
     # Configuration
-    correct_strato = False
     workdir = '.'
     sens_cache = f'{workdir}/Sensi'
     if isPost.lower() == 'false':
@@ -651,14 +608,8 @@ if __name__ == '__main__':
         
         # If not yet processed, run apply_tropomi_operator()
         if not os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
-            if correct_strato:
-                df = pd.read_csv('./lat_ratio.csv', index_col=0)
-                lat_mid = df.index
-                lat_ratio = df.values
-                output = apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
-            else:
-                print('Applying TROPOMI operator...')
-                output = apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache)
+            print('Applying TROPOMI operator...')
+            output = apply_tropomi_operator(filename, n_elements, gc_startdate, gc_enddate, xlim, ylim, gc_cache, build_jacobian, sens_cache)
         if output['obs_GC'].shape[0] > 0:
             print('Saving .pkl file')
             save_obj(output, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
