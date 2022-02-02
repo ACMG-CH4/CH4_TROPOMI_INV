@@ -55,13 +55,13 @@ def calc_sensi(nelements, perturbation, startday, endday, run_dirs_pth, run_name
             nlev = count the number of vertical levels
             for each hour:
                 base = extract the base run data for the hour
-                Sensi = np.empty((nlon, nlat, nlev, nelements))
+                Sensi = np.empty((nelements, nlev, nlat, nlon))
                 Sensi.fill(np.nan)
                 for each state vector element:
                     load the SpeciesConc .nc file for the element and day
                     pert = extract the data for the hour
                     sens = pert - base
-                    Sensi[:,:,:,element] = sens
+                    Sensi[element,:,:,:] = sens
                 save Sensi as netcdf with appropriate coordinate variables
     '''
 

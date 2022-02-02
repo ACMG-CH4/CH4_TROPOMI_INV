@@ -22,7 +22,7 @@ from shapely.geometry import Polygon
 #   the number of molecules instead. This requires saving out an additional GC 
 #   diagnostic variable -- something like the mass column in addition to PEDGE.
 # - Need to triple-check units of Jacobian [mixing ratio, unitless] vs units of
-#   virtual TROPOMI column [ppb] in use_AK_to_GC().
+#   virtual TROPOMI column [ppb] in apply_tropomi_operator().
 
 def save_obj(obj, name):
     """ Save something with Pickle. """
@@ -119,8 +119,8 @@ def read_tropomi(filename):
     tropomi_data.close()
     
     # Store vertical pressure profile
-    N1 = dat['methane'].shape[0]
-    N2 = dat['methane'].shape[1]
+    N1 = dat['methane'].shape[0] # length of along-track dimension (scanline) of retrieval field
+    N2 = dat['methane'].shape[1] # length of across-track dimension (ground_pixel) of retrieval field
     pressures = np.zeros([N1,N2,12+1], dtype=np.float32)
     pressures.fill(np.nan)
     for i in range(12+1):
@@ -130,15 +130,15 @@ def read_tropomi(filename):
     return dat
 
 
-def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_GC(date, GC_datadir, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
     Read GEOS-Chem data and save important variables to dictionary.
 
     Arguments
-        date           [str]   : date of interest
+        date           [str]   : Date of interest
         GC_datadir     [str]   : Path to GC output data
-        use_Sensi      [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        Sensi_datadir  [str]   : If use_Sensi=True, this is the path to the GC sensitivity data
+        build_jacobian [log]   : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        sens_cache     [str]   : If build_jacobian=True, this is the path to the GC sensitivity data
         correct_strato [log]   : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
         lat_mid        [float] : If correct_strato=True, this is the center latitude of each grid box
         lat_ratio      [float] : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
@@ -205,27 +205,27 @@ def read_GC(date, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strat
         dat['CH4_adjusted'] = CH4_adjusted
     
     # If need to construct Jacobian, read sensitivity data from GEOS-Chem perturbation simulations
-    if use_Sensi:
-        filename = f'{Sensi_datadir}/Sensi_{date}.nc'
-        sens_data = xr.open_dataset(filename)
-        Sensi = sens_data['Sensitivities'].values
-        Sensi = np.einsum('klji->ijlk', Sensi)
-        sens_data.close()
-        # Now adjust the Sensitivity
-        dat['Sensi'] = Sensi
+    if build_jacobian:
+        filename = f'{sens_cache}/Sensi_{date}.nc'
+        sensitivity_data = xr.open_dataset(filename)
+        sensitivities = sensitivity_data['Sensitivities'].values
+        # Reshape so the data have dimensions (lon, lat, lev, grid_element)
+        sensitivities = np.einsum('klji->ijlk', sensitivities)
+        sensitivity_data.close()
+        dat['Sensitivities'] = sensitivities
 
     return dat
 
 
-def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, correct_strato=False, lat_mid=None, lat_ratio=None):
+def read_all_GC(all_strdate, GC_datadir, build_jacobian=False, sens_cache=None, correct_strato=False, lat_mid=None, lat_ratio=None):
     """ 
     Call read_GC() for multiple dates in a loop. 
 
     Arguments
-        allstr_date    [list, str] : date strings
+        all_strdate    [list, str] : Multiple date strings
         GC_datadir     [str]       : Path to GC output data
-        use_Sensi      [log]       : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        Sensi_datadir  [str]       : If use_Sensi=True, this is the path to the GC sensitivity data
+        build_jacobian [log]       : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        sens_cache     [str]       : If build_jacobian=True, this is the path to the GC sensitivity data
         correct_strato [log]       : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias? 
         lat_mid        [float]     : If correct_strato=True, this is the center latitude of each grid box
         lat_ratio      [float]     : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
@@ -236,7 +236,7 @@ def read_all_GC(all_strdate, GC_datadir, use_Sensi=False, Sensi_datadir=None, co
 
     dat={}
     for strdate in all_strdate:
-        dat[strdate] = read_GC(strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio) 
+        dat[strdate] = read_GC(strdate, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio) 
     
     return dat
 
@@ -303,90 +303,92 @@ def merge_pressure_grids(p_sat, p_gc):
     return merged
 
 
-def remap(GC_CH4, data_type, p_merge, edge_index, first_gc_edge):
+def remap(gc_CH4, data_type, p_merge, edge_index, first_gc_edge):
     """
     Remap GEOS-Chem methane to the TROPOMI vertical grid.
 
     Arguments
-        GC_CH4        [float]   : Methane from GEOS-Chem
-        p_merge       [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
+        gc_CH4        [float]   : Methane from GEOS-Chem
+        p_merge       [float]   : Merged TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
         data_type     [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from merge_pressure_grids()
         edge_index    [int]     : Indexes of pressure edges, from merge_pressure_grids()
         first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        Sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
+        sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
     """
     
     # Define CH4 concentrations in the layers of the merged pressure grid
-    conc = np.zeros(len(p_merge)-1,)
-    conc.fill(np.nan)
+    CH4 = np.zeros(len(p_merge)-1,)
+    CH4.fill(np.nan)
     k=0
     for i in range(first_gc_edge, len(p_merge)-1):
-        conc[i] = GC_CH4[k]
+        CH4[i] = gc_CH4[k]
         if data_type[i+1] == 2:
             k=k+1
     if first_gc_edge > 0:
-        conc[:first_gc_edge] = conc[first_gc_edge]
+        CH4[:first_gc_edge] = CH4[first_gc_edge]
     
-    # Calculate the weighted mean methane for each TROPOMI layer
+    # Calculate the pressure-weighted mean methane for each TROPOMI layer
     delta_p = p_merge[:-1] - p_merge[1:]
-    Sat_CH4 = np.zeros(12); Sat_CH4.fill(np.nan)
+    sat_CH4 = np.zeros(12)
+    sat_CH4.fill(np.nan)
     for i in range(len(edge_index)-1):
         start = edge_index[i]
         end = edge_index[i+1]
-        sum_conc_times_pressure_weights = sum(conc[start:end]*delta_p[start:end])
+        sum_conc_times_pressure_weights = sum(CH4[start:end] * delta_p[start:end])
         sum_pressure_weights = sum(delta_p[start:end])
-        Sat_CH4[i] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
+        sat_CH4[i] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
     
-    return Sat_CH4
+    return sat_CH4
 
 
-def remap2(Sensi, data_type, p_merge, edge_index, first_gc_edge):
+def remap_sensitivities(sens_lonlat, data_type, p_merge, edge_index, first_gc_edge):
     """
     Remap GEOS-Chem sensitivity data (from perturbation simulations) to the TROPOMI vertical grid.
 
     Arguments
-        Sensi         [float]   : 4D sensitivity data from GC perturbation runs, with dims (lon, lat, alt, cluster) ****double-check dim order
+        sens_lonlat   [float]   : Sensitivity data from GC perturbation runs, for a specific lon/lat; has dims (lev, grid_element)
         p_merge       [float]   : Combined TROPOMI + GEOS-Chem pressure levels, from merge_pressure_grids()
         data_type     [int]     : Labels for pressure edges of merged grid. 1=TROPOMI, 2=GEOS-Chem, from merge_pressure_grids()
         edge_index    [int]     : Indexes of pressure edges, from merge_pressure_grids()
         first_gc_edge [int]     : Index of first GEOS-Chem pressure edge in merged grid, from merge_pressure_grids()
 
     Returns
-        Sat_CH4       [float]   : GC methane in TROPOMI pressure coordinates
+        sat_deltaCH4  [float]   : GC methane sensitivities in TROPOMI pressure coordinates
     """
     
-    # Define XCH4 in the layers of the merged pressure grid
-    MM = Sensi.shape[1]
-    conc = np.zeros((len(p_merge)-1, MM))
-    conc.fill(np.nan)
+    # Define DeltaCH4 in the layers of the merged pressure grid, for all perturbed state vector elements
+    n_elem = sens_lonlat.shape[1]
+    deltaCH4 = np.zeros((len(p_merge)-1, n_elem))
+    deltaCH4.fill(np.nan)
     k=0
     for i in range(first_gc_edge, len(p_merge)-1):
-        conc[i,:] = Sensi[k,:]
+        deltaCH4[i,:] = sens_lonlat[k,:]
         if data_type[i+1] == 2:
             k=k+1
     if first_gc_edge > 0:
-        conc[:first_gc_edge,:] = conc[first_gc_edge,:]
+        deltaCH4[:first_gc_edge,:] = deltaCH4[first_gc_edge,:]
     
-    # Calculate the weighted mean methane for each layer
+    # Calculate the weighted mean DeltaCH4 for each layer, for all perturbed state vector elements
     delta_p = p_merge[:-1] - p_merge[1:]
-    delta_ps = np.transpose(np.tile(delta_p, (MM,1)))
-    Sat_CH4 = np.zeros((12, MM)); Sat_CH4.fill(np.nan)
+    delta_ps = np.transpose(np.tile(delta_p, (n_elem,1)))
+    sat_deltaCH4 = np.zeros((12, n_elem))
+    sat_deltaCH4.fill(np.nan)
     for i in range(len(edge_index)-1):
         start = edge_index[i]
         end = edge_index[i+1]
-        sum_conc_times_pressure_weights = np.sum(conc[start:end,:]*delta_ps[start:end,:],0)
+        sum_conc_times_pressure_weights = np.sum(deltaCH4[start:end,:] * delta_ps[start:end,:], 0)
         sum_pressure_weights = np.sum(delta_p[start:end])
-        Sat_CH4[i,:] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
+        sat_deltaCH4[i,:] = sum_conc_times_pressure_weights/sum_pressure_weights # pressure-weighted average
     
-    return Sat_CH4
+    return sat_deltaCH4
 
 
-def nearest_loc(loc_query, loc_grid, tolerance=0.5):
+def nearest_loc(query_location, reference_grid, tolerance=0.5):
     """ Find the index of the nearest grid location to a query location, with some tolerance. """
 
-    distances = np.abs(loc_grid - loc_query)
+    distances = np.abs(reference_grid - query_location)
     ind = distances.argmin()
     if distances[ind] >= tolerance:
         return np.nan
@@ -394,9 +396,9 @@ def nearest_loc(loc_query, loc_grid, tolerance=0.5):
         return ind
 
 
-def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir, correct_strato=False, lat_mid=None, lat_ratio=None):
+def apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache, correct_strato=False, lat_mid=None, lat_ratio=None):
     """
-    Map GEOS-Chem data to TROPOMI observation space.
+    Apply the tropomi operator to map GEOS-Chem methane data to TROPOMI observation space.
 
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
@@ -406,21 +408,21 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         xlim           [float]      : Longitude bounds for simulation domain
         ylim           [float]      : Latitude bounds for simulation domain
         GC_datadir     [str]        : Path to GC output data
-        use_Sensi      [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
-        Sensi_datadir  [str]        : If use_Sensi=True, this is the path to the GC sensitivity data
+        build_jacobian [log]        : Are we trying to map GEOS-Chem sensitivities to TROPOMI observation space?
+        sens_cache     [str]        : If build_jacobian=True, this is the path to the GC sensitivity data
         correct_strato [log]        : Are we doing a latitudinal correction of GEOS-Chem stratospheric bias?
         lat_mid        [float]      : If correct_strato=True, this is the center latitude of each grid box
         lat_ratio      [float]      : If correct_strato=True, this is the ratio for correcting GC stratospheric methane to match ACE-FTS
 
     Returns
-        result         [dict]       : Dictionary with one or two fields:
+        output         [dict]       : Dictionary with one or two fields:
  	   	 		                        - obs_GC : GEOS-Chem and TROPOMI methane data
                                                     - TROPOMI methane
                                                     - GC methane
                                                     - TROPOMI lat, lon
                                                     - TROPOMI lat index, lon index
-				                      If use_Sensi=True, also include:
-				                        - KK     : Jacobian matrix
+				                      If build_jacobian=True, also include:
+				                        - K      : Jacobian matrix
     """
     
     # Read TROPOMI data
@@ -434,45 +436,44 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
                        (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
 
     # Number of TROPOMI observations
-    NN = len(sat_ind[0])
-    print('Found', NN, 'TROPOMI observations.')
+    n_obs = len(sat_ind[0])
+    print('Found', n_obs, 'TROPOMI observations.')
 
     # If need to build Jacobian from GC perturbation simulation sensitivity data:
-    if use_Sensi:
+    if build_jacobian:
         # Initialize Jacobian K
-        temp_KK = np.zeros([NN,n_elements], dtype=np.float32)
-        temp_KK.fill(np.nan)
-    
-    # Initialize array with NN rows, 6 columns: TROPOMI-CH4, GC-CH4, longitude, latitude, II, JJ
-    temp_obs_GC = np.zeros([NN,6], dtype=np.float32)
-    temp_obs_GC.fill(np.nan)
+        jacobian_K = np.zeros([n_obs,n_elements], dtype=np.float32)
+        jacobian_K.fill(np.nan)
     
     # Initialize a list to store the dates we want to look at
     all_strdate = []
 
     # For each TROPOMI observation
-    for iNN in range(NN):
-        
+    for k in range(n_obs):  
         # Get the date and hour
-        iSat = sat_ind[0][iNN] # lat index
-        jSat = sat_ind[1][iNN] # lon index
+        iSat = sat_ind[0][k] # lat index
+        jSat = sat_ind[1][k] # lon index
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
         all_strdate.append(strdate)
     all_strdate = list(set(all_strdate))
 
     # Read GEOS_Chem data for the dates of interest
-    all_date_GC = read_all_GC(all_strdate, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
-   
+    all_date_GC = read_all_GC(all_strdate, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
+    
+    # Initialize array with n_obs rows and 6 columns. Columns are TROPOMI-CH4, GC-CH4, longitude, latitude, II, JJ
+    obs_GC = np.zeros([n_obs,6], dtype=np.float32)
+    obs_GC.fill(np.nan)
+
     # For each TROPOMI observation: 
-    for iNN in range(NN):
+    for k in range(n_obs):
         
         # Get GC data for the date of the observation:
-        iSat = sat_ind[0][iNN]
-        jSat = sat_ind[1][iNN]
+        iSat = sat_ind[0][k]
+        jSat = sat_ind[1][k]
         p_sat = TROPOMI['pressures'][iSat,jSat,:]
         dry_air_subcolumns = TROPOMI['dry_air_subcolumns'][iSat,jSat,:]       # mol m-2
-        apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]              # mol m-2
+        apriori = TROPOMI['methane_profile_apriori'][iSat,jSat,:]             # mol m-2
         AK = TROPOMI['column_AK'][iSat,jSat,:]
         time = pd.to_datetime(str(TROPOMI['utctime'][iSat]))
         strdate = time.round('60min').strftime('%Y%m%d_%H')        
@@ -483,33 +484,34 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         latitude_bounds = TROPOMI['latitude_bounds'][iSat,jSat,:]
         corners_lon = []
         corners_lat = []
-        for k in range(4):
-            iGC = nearest_loc(longitude_bounds[k], GC['lon'])
-            jGC = nearest_loc(latitude_bounds[k], GC['lat'])
+        for l in range(4):
+            iGC = nearest_loc(longitude_bounds[l], GC['lon'])
+            jGC = nearest_loc(latitude_bounds[l], GC['lat'])
             corners_lon.append(iGC)
             corners_lat.append(jGC)
         # If the tolerance in nearest_loc() is not satisfied, skip the observation 
         if np.nan in corners_lon+corners_lat:
             continue
+        # Get lat/lon indexes and coordinates of GC grid cells closest to the TROPOMI corners
         GC_ij = [(x,y) for x in set(corners_lon) for y in set(corners_lat)]
-        GC_grids = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
+        GC_coords = [(GC['lon'][i], GC['lat'][j]) for i,j in GC_ij]
         
         # Compute the overlapping area between the TROPOMI pixel and GC grid cells it touches
-        overlap_area = np.zeros(len(GC_grids))
+        overlap_area = np.zeros(len(GC_coords))
         dlon = GC['lon'][1]-GC['lon'][0]
         dlat = GC['lat'][1]-GC['lat'][0]
         # Polygon representing TROPOMI pixel
         p0 = Polygon(np.column_stack((longitude_bounds,latitude_bounds)))
         # For each GC grid cell that touches the TROPOMI pixel: 
-        for ipixel in range(len(GC_grids)):
+        for iGridCell in range(len(GC_coords)):
             # Define polygon representing the GC grid cell
-            item = GC_grids[ipixel]
+            item = GC_coords[iGridCell]
             ap1 = [item[0]-dlon/2, item[0]+dlon/2, item[0]+dlon/2, item[0]-dlon/2]
             ap2 = [item[1]-dlat/2, item[1]-dlat/2, item[1]+dlat/2, item[1]+dlat/2]        
             p2 = Polygon(np.column_stack((ap1, ap2)))
             # Calculate overlapping area as the intersection of the two polygons
             if p2.intersects(p0):
-                  overlap_area[ipixel] = p0.intersection(p2).area
+                  overlap_area[iGridCell] = p0.intersection(p2).area
         
         # If there is no overlap between GC and TROPOMI, skip to next observation:
         if sum(overlap_area) == 0:
@@ -520,14 +522,14 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
         # =======================================================
         
         # Otherwise, initialize tropomi virtual xch4 and virtual sensitivity as zero
-        GC_base_posteri = 0   # virtual tropomi xch4
-        GC_base_sensi = 0     # virtual tropomi sensitivity
+        area_weighted_virtual_tropomi = 0       # virtual tropomi xch4
+        area_weighted_tropomi_sensitivity = 0   # virtual tropomi sensitivity
         
-        # For each GC ground cell that touches the TROPOMI pixel: 
-        for ipixel in range(len(GC_grids)):
+        # For each GC grid cell that touches the TROPOMI pixel: 
+        for iGridCell in range(len(GC_coords)):
             
             # Get GC lat/lon indices for the cell
-            iGC,jGC = GC_ij[ipixel]
+            iGC,jGC = GC_ij[iGridCell]
             
             # Get GC pressure edges for the cell
             p_gc = GC['PEDGE'][iGC,jGC,:]
@@ -542,68 +544,67 @@ def use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_
             merged = merge_pressure_grids(p_sat, p_gc)
             
             # Remap GC methane to TROPOMI pressure levels
-            Sat_CH4 = remap(GC_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
+            sat_CH4 = remap(GC_CH4, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])   # ppb
             
             # Convert ppb to mol m-2
-            Sat_CH4_2 = Sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
+            sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns   # mol m-2
             
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
-            tropomi_sees_ipixel = sum(apriori + AK * (Sat_CH4_2-apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
+            virtual_tropomi_iGridCell = sum(apriori + AK * (sat_CH4_molm2 - apriori)) / sum(dry_air_subcolumns) * 1e9   # ppb
             
             # Weight by overlapping area (to be divided out later) and add to sum
-            GC_base_posteri += overlap_area[ipixel] * tropomi_sees_ipixel  # ppb m2
+            area_weighted_virtual_tropomi += overlap_area[iGridCell] * virtual_tropomi_iGridCell  # ppb m2
 
-            # If building Jacobian matrix from GC perturbation simulation
-            # sensitivity data:
-            if use_Sensi:
+            # If building Jacobian matrix from GC perturbation simulation sensitivity data:
+            if build_jacobian:
                 
                 # Get GC perturbation sensitivities at this lat/lon, for all vertical levels and state vector elements
-                Sensi = GC['Sensi'][iGC,jGC,:,:]
+                sens_lonlat = GC['Sensitivities'][iGC,jGC,:,:]
                 
                 # Map the sensitivities to TROPOMI pressure levels
-                Sat_CH4 = remap2(Sensi, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])      # mixing ratio, unitless
+                sat_deltaCH4 = remap_sensitivities(sens_lonlat, merged['data_type'], merged['p_merge'], merged['edge_index'], merged['first_gc_edge'])  # mixing ratio, unitless
                 
                 # Tile the TROPOMI averaging kernel
-                AKs = np.transpose(np.tile(AK, (n_elements,1)))
+                AK_tiled = np.transpose(np.tile(AK, (n_elements,1)))
                 
                 # Tile the TROPOMI dry air subcolumns
-                dry_air_subcolumns_s = np.transpose(np.tile(dry_air_subcolumns, (n_elements,1)))   # mol m-2
+                dry_air_subcolumns_tiled = np.transpose(np.tile(dry_air_subcolumns, (n_elements,1)))   # mol m-2
                 
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
-                ap = np.sum(AKs*Sat_CH4*dry_air_subcolumns_s, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
+                tropomi_sensitivity_iGridCell = np.sum(AK_tiled*sat_deltaCH4*dry_air_subcolumns_tiled, 0) / sum(dry_air_subcolumns)   # mixing ratio, unitless
                 
                 # Weight by overlapping area (to be divided out later) and add to sum
-                GC_base_sensi += overlap_area[ipixel] * ap  # m2
+                area_weighted_tropomi_sensitivity += overlap_area[iGridCell] * tropomi_sensitivity_iGridCell  # m2
 
         # Compute virtual TROPOMI observation as weighted mean by overlapping area
         # i.e., need to divide out area [m2] from the previous step
-        virtual_tropomi = GC_base_posteri/sum(overlap_area)
+        virtual_tropomi = area_weighted_virtual_tropomi / sum(overlap_area)
  
-        # Save real and virtual TROPOMI data                        
-        temp_obs_GC[iNN,0] = TROPOMI['methane'][iSat,jSat]     # TROPOMI methane
-        temp_obs_GC[iNN,1] = virtual_tropomi                   # GC virtual TROPOMI methane
-        temp_obs_GC[iNN,2] = TROPOMI['longitude'][iSat,jSat]   # TROPOMI longitude
-        temp_obs_GC[iNN,3] = TROPOMI['latitude'][iSat,jSat]    # TROPOMI latitude 
-        temp_obs_GC[iNN,4] = iSat                              # TROPOMI index of longitude
-        temp_obs_GC[iNN,5] = jSat                              # TROPOMI index of lattitude
+        # Save actual and virtual TROPOMI data                    
+        obs_GC[k,0] = TROPOMI['methane'][iSat,jSat]     # Actual TROPOMI methane column observation
+        obs_GC[k,1] = virtual_tropomi                   # Virtual TROPOMI methane column observation
+        obs_GC[k,2] = TROPOMI['longitude'][iSat,jSat]   # TROPOMI longitude
+        obs_GC[k,3] = TROPOMI['latitude'][iSat,jSat]    # TROPOMI latitude 
+        obs_GC[k,4] = iSat                              # TROPOMI index of longitude
+        obs_GC[k,5] = jSat                              # TROPOMI index of latitude
 
-        if use_Sensi:
+        if build_jacobian:
             # Compute TROPOMI sensitivity as weighted mean by overlapping area
             # i.e., need to divide out area [m2] from the previous step
-            temp_KK[iNN,:] = GC_base_sensi/sum(overlap_area)
+            jacobian_K[k,:] = area_weighted_tropomi_sensitivity / sum(overlap_area)
     
     # Output 
-    result = {}
+    output = {}
 
     # Always return the coincident TROPOMI and GC data
-    result['obs_GC'] = temp_obs_GC
+    output['obs_GC'] = obs_GC
 
     # Optionally return the Jacobian
-    if use_Sensi:
-        result['KK'] = temp_KK
+    if build_jacobian:
+        output['K'] = jacobian_K
     
-    return result
+    return output
 
 
 
@@ -628,13 +629,13 @@ if __name__ == '__main__':
     # Configuration
     correct_strato = False
     workdir = '.'
-    Sensi_datadir = f'{workdir}/Sensi'
+    sens_cache = f'{workdir}/Sensi'
     if isPost.lower() == 'false':
-        use_Sensi = True
+        build_jacobian = True
         GC_datadir = f'{workdir}/data_GC'
         outputdir = f'{workdir}/data_converted'
     else: # if sampling posterior simulation
-        use_Sensi = False
+        build_jacobian = False
         GC_datadir = f'{workdir}/data_GC_posterior'
         outputdir = f'{workdir}/data_converted_posterior'
     xlim = [lonmin,lonmax]
@@ -646,7 +647,7 @@ if __name__ == '__main__':
     
     # Get TROPOMI data filenames for the desired date range
     allfiles = glob.glob(f'{Sat_datadir}/*.nc')
-    Sat_files = []
+    sat_files = []
     for index in range(len(allfiles)):
         filename = allfiles[index]
         shortname = re.split('\/', filename)[-1]
@@ -654,13 +655,13 @@ if __name__ == '__main__':
         strdate = re.split('\.|_+|T',shortname)[4]
         strdate2 = datetime.datetime.strptime(strdate, '%Y%m%d')
         if ((strdate2 >= GC_startdate) and (strdate2 <= GC_enddate)):
-            Sat_files.append(filename)
-    Sat_files.sort()
-    print('Found', len(Sat_files), 'TROPOMI data files.')
+            sat_files.append(filename)
+    sat_files.sort()
+    print('Found', len(sat_files), 'TROPOMI data files.')
 
     # Map GEOS-Chem to TROPOMI observation space
-    # Also return Jacobian matrix if use_Sensi=True
-    for filename in Sat_files:
+    # Also return Jacobian matrix if build_jacobian=True
+    for filename in sat_files:
         
         # Check if TROPOMI file has already been processed
         print('========================')
@@ -668,18 +669,18 @@ if __name__ == '__main__':
         print(temp)
         date = re.split('\.',temp)[0]
         
-        # If not yet processed, run use_AK_to_GC()
+        # If not yet processed, run apply_tropomi_operator()
         if not os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
             if correct_strato:
                 df = pd.read_csv('./lat_ratio.csv', index_col=0)
                 lat_mid = df.index
                 lat_ratio = df.values
-                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir, correct_strato, lat_mid, lat_ratio)
+                output = apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache, correct_strato, lat_mid, lat_ratio)
             else:
-                print('Running use_AK_to_GC().')
-                result = use_AK_to_GC(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, use_Sensi, Sensi_datadir)
-        if result['obs_GC'].shape[0] > 0:
+                print('Applying TROPOMI operator...')
+                output = apply_tropomi_operator(filename, n_elements, GC_startdate, GC_enddate, xlim, ylim, GC_datadir, build_jacobian, sens_cache)
+        if output['obs_GC'].shape[0] > 0:
             print('Saving .pkl file')
-            save_obj(result, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
+            save_obj(output, f'{outputdir}/{date}_GCtoTROPOMI.pkl')
 
     print(f'Wrote files to {outputdir}')
