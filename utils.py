@@ -161,12 +161,12 @@ def plot_field(ax, field, cmap, plot_type='pcolormesh', lon_bounds=None, lat_bou
         field.plot.pcolormesh(cmap=cmap, levels=levels, ax=ax,
                               vmin=vmin, vmax=vmax, cbar_kwargs={'label':cbar_label,
                                                                  'fraction':0.041, 
-                                                                 'pad':0.04});
+                                                                 'pad':0.04})
     elif plot_type == 'imshow':
         field.plot.imshow(cmap=cmap, ax=ax,
                           vmin=vmin, vmax=vmax, cbar_kwargs={'label':cbar_label,
                                                              'fraction':0.041, 
-                                                             'pad':0.04});
+                                                             'pad':0.04})
     else:
         raise ValueError('plot_type must be "pcolormesh" or "imshow"')
     

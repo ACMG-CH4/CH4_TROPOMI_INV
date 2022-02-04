@@ -224,41 +224,43 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     df_counts = df_counts.groupby(['lat','lon']).sum()
     ds_counts = df_counts.to_xarray()
 
+    plt.rcParams.update({'font.size': 18})
+
     # Plot prior emissions
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(10,8))
     ax = fig.subplots(1,1,subplot_kw={'projection': ccrs.PlateCarree()})
     plot_field(ax, prior_kgkm2h, cmap=cc.cm.linear_kryw_5_100_c67_r, plot_type='pcolormesh',
                vmin=0, vmax=14, lon_bounds=None, lat_bounds=None, levels=21,
-               title='Prior emissions$', cbar_label='Emissions (kg km$^{-2}$ h$^{-1}$)', 
+               title='Prior emissions', cbar_label='Emissions (kg km$^{-2}$ h$^{-1}$)', 
                mask=mask, only_ROI=False)
-    plt.savefig(os.path.join(preview_dir,'preview_prior_emissions.png'))
+    plt.savefig(os.path.join(preview_dir,'preview_prior_emissions.png'),dpi=150)
 
     # Plot observations
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(10,8))
     ax = fig.subplots(1,1,subplot_kw={'projection': ccrs.PlateCarree()})
     plot_field(ax, ds['xch4'], cmap='Spectral_r', plot_type='imshow',
                vmin=1800, vmax=1850, lon_bounds=None, lat_bounds=None,
                title='TROPOMI $X_{CH4}$', cbar_label='Column mixing ratio (ppb)', 
                mask=mask, only_ROI=False)
-    plt.savefig(os.path.join(preview_dir,'preview_observations.png'))
+    plt.savefig(os.path.join(preview_dir,'preview_observations.png'),dpi=150)
 
     # Plot albedo
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(10,8))
     ax = fig.subplots(1,1,subplot_kw={'projection': ccrs.PlateCarree()})
     plot_field(ax, ds['swir_albedo'], cmap='magma', plot_type='imshow',
                vmin=0, vmax=0.4, lon_bounds=None, lat_bounds=None,
                title='SWIR Albedo', cbar_label='Albedo', 
                mask=mask, only_ROI=False)
-    plt.savefig(os.path.join(preview_dir,'preview_albedo.png'))
+    plt.savefig(os.path.join(preview_dir,'preview_albedo.png'),dpi=150)
 
     # Plot observation density
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(10,8))
     ax = fig.subplots(1,1,subplot_kw={'projection': ccrs.PlateCarree()})
     plot_field(ax, ds_counts['counts'], cmap='Blues', plot_type='imshow',
-               vmin=0, vmax=np.max(ds_counts['counts'].values), lon_bounds=None, lat_bounds=None,
+               vmin=0, vmax=np.nanmax(ds_counts['counts'].values), lon_bounds=None, lat_bounds=None,
                title='Observation density', cbar_label='Number of observations', 
                mask=mask, only_ROI=False)
-    plt.savefig(os.path.join(preview_dir,'preview_observation_density.png'))
+    plt.savefig(os.path.join(preview_dir,'preview_observation_density.png'),dpi=150)
 
 
 if __name__ == '__main__':
