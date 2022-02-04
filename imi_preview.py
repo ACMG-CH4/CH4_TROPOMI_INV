@@ -210,11 +210,19 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     prior_kgkm2h = prior * (1000**2) * 60*60      # Units kg/km2/h
 
     # Prepare plot data for observations
-    df_copy = df.copy(deep=True)                  
-    df_copy['lat'] = np.round(df_copy['lat'],1)   # Bin to 0.1x0.1 degrees
-    df_copy['lon'] = np.round(df_copy['lon'],1)
-    df_copy = df_copy.groupby(['lat','lon']).mean()
-    ds = df_copy.to_xarray()
+    df_means = df.copy(deep=True)
+    df_means['lat'] = np.round(df_means['lat'],1)   # Bin to 0.1x0.1 degrees
+    df_means['lon'] = np.round(df_means['lon'],1)
+    df_means = df_means.groupby(['lat','lon']).mean()
+    ds = df_means.to_xarray()
+
+    # Prepare plot data for observation counts
+    df_counts = df.copy(deep=True).drop(['xch4','swir_albedo'], axis=1)
+    df_counts['counts'] = 1
+    df_counts['lat'] = np.round(df_counts['lat'],1)   # Bin to 0.1x0.1 degrees
+    df_counts['lon'] = np.round(df_counts['lon'],1)
+    df_counts = df_counts.groupby(['lat','lon']).sum()
+    ds_counts = df_counts.to_xarray()
 
     # Plot prior emissions
     fig = plt.figure(figsize=(8,8))
@@ -242,6 +250,15 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
                title='SWIR Albedo', cbar_label='Albedo', 
                mask=mask, only_ROI=False)
     plt.savefig(os.path.join(preview_dir,'preview_albedo.png'))
+
+    # Plot observation density
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.subplots(1,1,subplot_kw={'projection': ccrs.PlateCarree()})
+    plot_field(ax, ds_counts['counts'], cmap='Blues', plot_type='imshow',
+               vmin=0, vmax=np.max(ds_counts['counts'].values), lon_bounds=None, lat_bounds=None,
+               title='Observation density', cbar_label='Number of observations', 
+               mask=mask, only_ROI=False)
+    plt.savefig(os.path.join(preview_dir,'preview_observation_density.png'))
 
 
 if __name__ == '__main__':
