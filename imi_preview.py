@@ -11,12 +11,51 @@ import datetime
 import cartopy.crs as ccrs
 import colorcet as cc
 from utils import calculate_gridcell_areas, sum_total_emissions, count_obs_in_mask, plot_field
+from joblib import Parallel, delayed
 from jacobian import read_tropomi
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+'''
+Returns a list with the lat, lon, xch4, and albedo_swir observations 
+extracted from the given tropomi file. Filters are applied to remove
+faulty observations
+Args:
+    file_path : string
+        path to the tropomi file
+        Default value: False
+Returns:
+     tropomi_data : dict of the extracted values
 
-def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
+'''
+def get_TROPOMI_data(file_path):
+    print(f'Reading TROPOMI file: {file_path}', end='\r')
+    # tropomi data dictionary
+    tropomi_data = {'lat': [], 'lon': [], 'xch4': [], 'swir_albedo': []}
+
+    # Load the TROPOMI data
+    TROPOMI = read_tropomi(file_path)
+    
+    # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
+    sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
+                       (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
+                       (TROPOMI['time'] >= startdate_np64)    & (TROPOMI['time'] <= enddate_np64)     &
+                       (TROPOMI['qa_value']  >= 0.5)          &
+                       (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
+    
+    # Loop over observations and archive
+    num_obs = len(sat_ind[0])
+    for k in range(num_obs):
+        lat_idx = sat_ind[0][k]
+        lon_idx = sat_ind[1][k]
+        tropomi_data['lat'] = tropomi_data['lat'].append(TROPOMI['latitude'][lat_idx,lon_idx])
+        tropomi_data['lon'] = tropomi_data['lon'].append(TROPOMI['longitude'][lat_idx,lon_idx])
+        tropomi_data['xch4'] = tropomi_data['xch4'].append(TROPOMI['methane'][lat_idx,lon_idx])
+        tropomi_data['swir_albedo'] = tropomi_data['swir_albedo'].append(TROPOMI['swir_albedo'][lat_idx,lon_idx])
+    return tropomi_data
+    
+
+def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache, cpu_count):
     '''
     Function to perform preview
     Requires preview simulation to have been run already (to generate HEMCO diags)
@@ -94,29 +133,38 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     lon = []
     xch4 = []
     albedo = []
-    for j in range(len(tropomi_paths)):
 
-        # Load the TROPOMI data
-        TROPOMI = read_tropomi(tropomi_paths[j])
+    observations_dicts = Parallel(n_jobs=cpu_count)(delayed(get_TROPOMI_data)(file_path) for file_path in tropomi_paths)
+
+    for dict in observations_dicts:
+        lat.append(dict['latitude'])
+        lon.append(dict['longitude'])
+        xch4.append(dict['methane'])
+        albedo.append(dict['swir_albedo'])
+
+    # for j in range(len(tropomi_paths)):
+
+    #     # Load the TROPOMI data
+    #     TROPOMI = read_tropomi(tropomi_paths[j])
         
-        # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
-        sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
-                           (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
-                           (TROPOMI['time'] >= startdate_np64)    & (TROPOMI['time'] <= enddate_np64)     &
-                           (TROPOMI['qa_value']  >= 0.5)          &
-                           (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
+    #     # We're only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
+    #     sat_ind = np.where((TROPOMI['longitude'] >  xlim[0])      & (TROPOMI['longitude'] <  xlim[1])     & 
+    #                        (TROPOMI['latitude']  >  ylim[0])      & (TROPOMI['latitude']  <  ylim[1])     & 
+    #                        (TROPOMI['time'] >= startdate_np64)    & (TROPOMI['time'] <= enddate_np64)     &
+    #                        (TROPOMI['qa_value']  >= 0.5)          &
+    #                        (TROPOMI['swir_albedo'] > 0.05)        & (TROPOMI['blended_albedo'] < 0.85))
         
-        # Loop over observations and archive
-        num_obs = len(sat_ind[0])
-        for k in range(num_obs):
-            lat_idx = sat_ind[0][k]
-            lon_idx = sat_ind[1][k]
-            lat.append(TROPOMI['latitude'][lat_idx,lon_idx])
-            lon.append(TROPOMI['longitude'][lat_idx,lon_idx])
-            xch4.append(TROPOMI['methane'][lat_idx,lon_idx])
-            albedo.append(TROPOMI['swir_albedo'][lat_idx,lon_idx])
+    #     # Loop over observations and archive
+    #     num_obs = len(sat_ind[0])
+    #     for k in range(num_obs):
+    #         lat_idx = sat_ind[0][k]
+    #         lon_idx = sat_ind[1][k]
+    #         lat.append(TROPOMI['latitude'][lat_idx,lon_idx])
+    #         lon.append(TROPOMI['longitude'][lat_idx,lon_idx])
+    #         xch4.append(TROPOMI['methane'][lat_idx,lon_idx])
+    #         albedo.append(TROPOMI['swir_albedo'][lat_idx,lon_idx])
         
-        print(f'Reading TROPOMI file {j+1}/{len(tropomi_paths)}: {tropomi_paths[j]}', end='\r')
+    #     print(f'Reading TROPOMI file {j+1}/{len(tropomi_paths)}: {tropomi_paths[j]}', end='\r')
     
     # Assemble in dataframe    
     df = pd.DataFrame()
