@@ -177,14 +177,19 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     # Estimate cost by scaling reference cost of $20 for one-month Permian inversion
     # Reference number of state variables = 243
     # Reference number of days = 31
+    # Reference cost for EC2 storage = $50 per month
     reference_cost = 20
+    reference_num_compute_hours = 10
+    hours_in_month = 31*24
+    reference_storage_cost = 50 * reference_num_compute_hours / hours_in_month
     num_state_variables = np.nanmax(state_vector_labels.values)
     num_days = np.round((enddate_np64-startdate_np64)/np.timedelta64(1, 'D'))
     if config['Res'] == '0.25x0.3125':
         res_factor = 1
     elif config['Res'] == '0.5x0.625':
-        res_factor = 0.5
-    expected_cost = reference_cost * (num_state_variables/243)**2 * (num_days/31) * res_factor
+        res_factor = 0.5  
+    additional_storage_cost = ((num_days/31)-1) * reference_storage_cost
+    expected_cost = (reference_cost + additional_storage_cost) * (num_state_variables/243)**2 * (num_days/31) * res_factor
 
     outstring6 = f'approximate cost = ${np.round(expected_cost,2)} for on-demand instance'
     outstring7 = f'                 = ${np.round(expected_cost/3,2)} for spot instance'
