@@ -46,8 +46,6 @@ def get_TROPOMI_data(file_path, xlim, ylim, startdate_np64, enddate_np64):
     # tropomi data dictionary
     tropomi_data = {"lat": [], "lon": [], "xch4": [], "swir_albedo": []}
 
-    print(f"Reading TROPOMI file: {file_path}", end="\r")
-
     # Load the TROPOMI data
     TROPOMI = read_tropomi(file_path)
 

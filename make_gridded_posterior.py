@@ -6,7 +6,7 @@ import numpy as np
 
 def do_gridding(vector, statevector):
     '''
-    Project input vector on the inversion grid using information from the state vector file.
+    Project input vector onto the inversion grid using information from the state vector file.
     Input vector should be a numpy array of scale factors (SF), diagonal elements of the posterior 
     error covariance matrix (S_post), or diagonal elements of the averaging kernel matrix (A).
     '''
@@ -37,10 +37,10 @@ def make_gridded_posterior(posterior_SF_path, state_vector_path, save_path):
     The IMI code outputs the inversion results as vectors and matrices (in a .nc file).
     We (and HEMCO, for scale factors) want the results as a gridded product, by latitude/longitude.
     This script uses the inversion results file and the state vector file to generate a gridded
-    version of the posterior scaling factors, posterior errors, and averaging kernel sensitivities.
+    version of the posterior scale factors, posterior errors, and averaging kernel sensitivities.
 
     Arguments
-       posterior_SF_path [str] : path to the posterior scaling factors from an inversion
+       posterior_SF_path [str] : path to the posterior scale factors from an inversion
        state_vector_path [str] : path to the state vector file, from which we will take coords information
        save_path         [str] : path where the gridded posterior should be saved
 

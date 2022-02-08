@@ -6,15 +6,15 @@ from joblib import Parallel, delayed
 
 def fill_missing_hour(run_name, run_dirs_pth, prev_run_pth, start_day):
     '''
-    This script addresses the problem that output files for the first day of a 
+    This script addresses the fact that output files for the first day of a 
     GEOS-Chem simulation do not include data for the first hour of the day; they
     go from 1-23h, instead of 0-23h. The solution is to combine the final output
     file of a previous simulation (the spinup simulation), which contains data 
     for hour 0 of the last day, with the first output file of the more recent 
-    simulation (a production simulation). This needs to be done for both 
+    simulation (e.g., a sensitivity simulation). This needs to be done for both 
     SpeciesConc and LevelEdgeDiags, and it needs to be done for every run 
-    directory: i.e., for every perturbed state vector element simulation, and
-    also for the base/reference simulation. 
+    directory: i.e., for every perturbed-state-vector-element simulation, and
+    also for the reference simulation. 
     
     Example:
     A GEOS-Chem perturbation simulation for one month, from 20180501 to 20180601. 

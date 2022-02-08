@@ -21,7 +21,8 @@ eval $(parse_yaml ../../../setup_CH4/config.yml)
 # It also define $PriorError, $ObsError, $Gamma, $PrecomputedJacobian
 # Parsing the config file here facilitates generation of inversion ensembles
 # All that needs to be done is to edit the config file for $PriorError, $ObsError, and $Gamma, 
-# make sure $PrecomputedJacobian is true, and then re-run this script (or run_ch4_inversion.sh)
+# make sure $PrecomputedJacobian is true, and then re-run this script (or run_ch4_inversion.sh
+# with only the $DoInversion module switched on in config.yml).
 
 #=======================================================================
 # Configuration (these settings generated on initial setup)
@@ -42,14 +43,8 @@ GCDir="./data_GC"
 JacobianDir="./data_converted"
 tropomiCache="${MyPath}/${RunName}/data_TROPOMI"
     
-# Only matters for Kalman filter multi-week inversions, not yet implemented
+# Only matters for Kalman filter inversions, to be implemented in a future version of the IMI
 FirstSimSwitch=true
-
-# Load the Python environment
-# Comment this out for now and instruct users to activate their own Python envs
-# module load Anaconda3/5.0.1-fasrc01
-# source activate tropomi_oilgas_jupyter_3.6
-
 
 printf "\n=== EXECUTING RUN_INVERSION.SH ===\n"
     

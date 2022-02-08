@@ -590,8 +590,8 @@ if __name__ == '__main__':
         shortname = re.split('\/', filename)[-1]
         shortname = re.split('\.', shortname)[0]
         strdate = re.split('\.|_+|T',shortname)[4]
-        strdate2 = datetime.datetime.strptime(strdate, '%Y%m%d')
-        if ((strdate2 >= gc_startdate) and (strdate2 <= gc_enddate)):
+        strdate = datetime.datetime.strptime(strdate, '%Y%m%d')
+        if ((strdate >= gc_startdate) and (strdate <= gc_enddate)):
             sat_files.append(filename)
     sat_files.sort()
     print('Found', len(sat_files), 'TROPOMI data files.')
@@ -602,9 +602,9 @@ if __name__ == '__main__':
         
         # Check if TROPOMI file has already been processed
         print('========================')
-        temp = re.split('\/', filename)[-1]
-        print(temp)
-        date = re.split('\.',temp)[0]
+        shortname = re.split('\/', filename)[-1]
+        print(shortname)
+        date = re.split('\.',shortname)[0]
         
         # If not yet processed, run apply_tropomi_operator()
         if not os.path.isfile(f'{outputdir}/{date}_GCtoTROPOMI.pkl'):
